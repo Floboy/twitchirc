@@ -1,7 +1,7 @@
 import re
 import typing
 
-import irclib
+import twitchirc
 
 
 def process_twitch_flags(flags) -> typing.Dict[str, typing.Union[str, typing.List[str]]]:
@@ -64,7 +64,7 @@ class ChannelMessage(Message):
     @staticmethod
     def from_text(text):
 
-        m = re.match(irclib.PRIVMSG_PATTERN_TWITCH, text)
+        m = re.match(twitchirc.PRIVMSG_PATTERN_TWITCH, text)
         if m:
             return ChannelMessage.from_match(m)
         else:
@@ -190,7 +190,7 @@ class NoticeMessage(Message):
 
     @staticmethod
     def from_text(text):
-        m = re.match(irclib.NOTICE_MESSAGE_PATTERN, text)
+        m = re.match(twitchirc.NOTICE_MESSAGE_PATTERN, text)
         if m:
             return NoticeMessage.from_match(m)
         else:
@@ -264,11 +264,11 @@ MESSAGE_PATTERN_DICT: typing.Dict[str, typing.Union[
     typing.Type[PingMessage],
     typing.Type[NoticeMessage]]
 ] = {
-    irclib.PRIVMSG_PATTERN_TWITCH: ChannelMessage,
-    irclib.PING_MESSAGSE_PATTERN: PingMessage,
-    irclib.NOTICE_MESSAGE_PATTERN: NoticeMessage,
-    irclib.JOIN_MESSAGE_PATTERN: JoinMessage,
-    irclib.PART_MESSAGE_PATTERN: PartMessage
+    twitchirc.PRIVMSG_PATTERN_TWITCH: ChannelMessage,
+    twitchirc.PING_MESSAGSE_PATTERN: PingMessage,
+    twitchirc.NOTICE_MESSAGE_PATTERN: NoticeMessage,
+    twitchirc.JOIN_MESSAGE_PATTERN: JoinMessage,
+    twitchirc.PART_MESSAGE_PATTERN: PartMessage
 }
 
 

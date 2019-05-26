@@ -3,7 +3,7 @@ import socket
 import time
 import typing
 
-import irclib  # Import self.
+import twitchirc  # Import self.
 
 
 def readuntil(buffer, char, max_size=1024):
@@ -36,7 +36,7 @@ class Connection:
         self.queue: typing.Dict[str, typing.List[bytes]] = {
             'misc': []
         }
-        self.receive_queue: typing.List[typing.Union[irclib.Message, irclib.ChannelMessage, irclib.PingMessage]] = []
+        self.receive_queue: typing.List[typing.Union[twitchirc.Message, twitchirc.ChannelMessage, twitchirc.PingMessage]] = []
         self.receive_buffer: str = ''
         self.message_wait: typing.Dict[str, float] = {
             'misc': time.time()
@@ -53,14 +53,14 @@ class Connection:
                     pass
 
     def join(self, channel):
-        irclib.info('Joining channel {}'.format(channel))
+        twitchirc.info('Joining channel {}'.format(channel))
         self.force_send('join #{}\r\n'.format(channel))
         self.queue[channel] = []
         self.message_wait[channel] = time.time()
         self.channels_connected.append(channel)
 
     def part(self, channel):
-        irclib.info(f'Departing from channel {channel}')
+        twitchirc.info(f'Departing from channel {channel}')
         self.force_send(f'part #{channel}\r\n')
         self.channels_to_remove.append(channel)
 
@@ -71,7 +71,7 @@ class Connection:
         self.socket = None
 
     def twitch_mode(self):
-        irclib.info('Twitch mode enabled.')
+        twitchirc.info('Twitch mode enabled.')
         self.force_send('CAP REQ :twitch.tv/commands twitch.tv/membership twitch.tv/tags\r\n')
 
     def connect(self, username, password: typing.Union[str, None] = None) -> None:
@@ -81,11 +81,11 @@ class Connection:
         :param username: Username that will be used.
         :param password: Password to be sent. If None the PASS packet will not be sent.
         """
-        irclib.info('Connecting...')
+        twitchirc.info('Connecting...')
         self._connect()
-        irclib.info('Logging in...')
+        twitchirc.info('Logging in...')
         self._login(username, password)
-        irclib.info('OK.')
+        twitchirc.info('OK.')
 
     def _login(self, username, password: typing.Union[str, None] = None):
         if password is not None:
@@ -97,7 +97,7 @@ class Connection:
         self.socket = socket.socket()
         self.socket.connect((self.address, self.port))
 
-    def send(self, message: typing.Union[str, irclib.ChannelMessage], queue='misc') -> None:
+    def send(self, message: typing.Union[str, twitchirc.ChannelMessage], queue='misc') -> None:
         """
         Queue a packet to be sent to the server.
 
@@ -107,19 +107,19 @@ class Connection:
         :param message: Message to be sent to the server.
         :return: Nothing
         """
-        if isinstance(message, irclib.ChannelMessage):
+        if isinstance(message, twitchirc.ChannelMessage):
             if message.user == 'rcfile':
-                irclib.info(str(message))
+                twitchirc.info(str(message))
                 return
             queue = message.channel
         if self.socket is not None or self.hold_send:
-            irclib.info('Queued message: {}'.format(message))
+            twitchirc.info('Queued message: {}'.format(message))
             if queue not in self.queue:
                 self.queue[queue] = []
                 self.message_wait[queue] = time.time()
             self.queue[queue].append(to_bytes(message, 'utf-8'))
         else:
-            irclib.info(f'Cannot queue message: {message!r}: Not connected.')
+            twitchirc.info(f'Cannot queue message: {message!r}: Not connected.')
 
     def force_send(self, message: str):
         """
@@ -129,7 +129,7 @@ class Connection:
         :param message: Message to be sent to the server.
         :return: Nothing
         """
-        irclib.info('Force send message: {!r}'.format(message))
+        twitchirc.info('Force send message: {!r}'.format(message))
         self.queue['misc'].insert(0, to_bytes(message, 'utf-8'))
         self.flush_single_queue('misc', no_cooldown=True)
 
@@ -145,7 +145,7 @@ class Connection:
             return 0
         sent = 0
         for num, message in enumerate(self.queue[queue][:max_messages]):
-            irclib.info(f'Sending message {message!r}')
+            twitchirc.info(f'Sending message {message!r}')
             self._send(message)
             sent += 1
             self.message_wait[queue] = now + self.message_cooldown
@@ -164,9 +164,9 @@ class Connection:
     def receive(self):
         """Return all messages that are waiting to be read."""
         message = str(self.socket.recv(4096), 'utf-8', errors='ignore').replace('\r\n', '\n')
-        # irclib.info(f'< {message!r}')
+        # twitchirc.info(f'< {message!r}')
         if message == '':
-            irclib.log('WARN', 'Empty message')
+            twitchirc.log('WARN', 'Empty message')
             self.disconnect()
             exit()
         self.receive_buffer += message
@@ -178,7 +178,7 @@ class Connection:
                 del self.message_wait[i]
                 del self.queue[i]
 
-    def process_messages(self, max_messages: int = 1, mode=-1) -> typing.List[irclib.Message]:
+    def process_messages(self, max_messages: int = 1, mode=-1) -> typing.List[twitchirc.Message]:
         """
         Process the messages from self.receive_buffer
         Modes:
@@ -202,8 +202,8 @@ class Connection:
             # Remove `message` from the buffer.
             if message == '':
                 continue
-            m = irclib.auto_message(message)
-            if isinstance(m, irclib.ChannelMessage):
+            m = twitchirc.auto_message(message)
+            if isinstance(m, twitchirc.ChannelMessage):
                 if mode in [-1, 0]:
                     messages_to_return.append(m)
                 else:

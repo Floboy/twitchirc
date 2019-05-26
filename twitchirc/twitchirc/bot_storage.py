@@ -2,7 +2,7 @@ import copy
 import json
 import os
 
-import irclib
+import twitchirc
 
 
 class AmbiguousSaveError(Exception):
@@ -48,7 +48,7 @@ class Storage:
         self._save()
 
     def __repr__(self):
-        return f'irclib.Storage(auto_save={self.auto_save})'
+        return f'twitchirc.Storage(auto_save={self.auto_save})'
 
     def __str__(self):
         return '<Storage>'
@@ -63,7 +63,7 @@ class Storage:
 
 class JsonStorage(Storage):
     def __repr__(self):
-        return f'irclib.JsonStorage(file={self.file}, auto_save={self.auto_save})'
+        return f'twitchirc.JsonStorage(file={self.file}, auto_save={self.auto_save})'
 
     def __str__(self):
         return '<JsonStorage>'
@@ -75,10 +75,10 @@ class JsonStorage(Storage):
 
         self.file = os.path.abspath(file)
         try:
-            irclib.info(f'Reading file {self.file}')
+            twitchirc.info(f'Reading file {self.file}')
             self.load()
         except (CannotLoadError, json.decoder.JSONDecodeError) as e:
-            irclib.warn(f'Failed to load JsonStorage: {e}')
+            twitchirc.warn(f'Failed to load JsonStorage: {e}')
             self.data = default
 
     def _load(self):
@@ -90,7 +90,7 @@ class JsonStorage(Storage):
         return data
 
     def _save(self):
-        irclib.log('debug', f'Saving file {self.file!r}')
+        twitchirc.log('debug', f'Saving file {self.file!r}')
         try:
             with open(self.file, 'r') as f:
                 try:
@@ -105,4 +105,4 @@ class JsonStorage(Storage):
         with open(self.file, 'w') as f:
             json.dump(self.data, f)
         self._old_data = copy.deepcopy(self.data)
-        irclib.log('debug', f'Saved file {self.file!r}')
+        twitchirc.log('debug', f'Saved file {self.file!r}')

@@ -1,6 +1,6 @@
 import typing
 
-import irclib
+import twitchirc
 
 
 def require_permission(permission: str):
@@ -12,8 +12,8 @@ def require_permission(permission: str):
     :param permission: The permission
     """
 
-    def decorator(func: irclib.Command) -> irclib.Command:
-        if isinstance(func, irclib.Command):
+    def decorator(func: twitchirc.Command) -> twitchirc.Command:
+        if isinstance(func, twitchirc.Command):
             func.permissions_required.append(permission)
             return func
         else:
@@ -22,7 +22,7 @@ def require_permission(permission: str):
     return decorator
 
 
-def auto_group(message: irclib.ChannelMessage) -> str:
+def auto_group(message: twitchirc.ChannelMessage) -> str:
     """
     Get the user's group. This uses the Twitch badges.
 
@@ -55,34 +55,34 @@ class PermissionList:
 
             ],
             'moderator': [
-                irclib.GROUP_PARENT.format('default')
+                twitchirc.GROUP_PARENT.format('default')
                 # 'parent.default'
             ],
             'subscriber': [
-                irclib.GROUP_PARENT.format('default')
+                twitchirc.GROUP_PARENT.format('default')
             ],
             'staff': [
-                irclib.GROUP_PARENT.format('admin')
+                twitchirc.GROUP_PARENT.format('admin')
             ],
             'global_moderator': [
-                irclib.GROUP_PARENT.format('moderator'),
+                twitchirc.GROUP_PARENT.format('moderator'),
                 # 'parent.moderator',
-                irclib.GLOBAL_BYPASS_PERMISSION
+                twitchirc.GLOBAL_BYPASS_PERMISSION
             ],
             'vip': [
-                irclib.GROUP_PARENT.format('default')
+                twitchirc.GROUP_PARENT.format('default')
                 # 'parent.default'
             ],
             'broadcaster': [
-                irclib.GROUP_PARENT.format('moderator')
+                twitchirc.GROUP_PARENT.format('moderator')
                 # 'parent.moderator'
             ],
             'admin': [
-                irclib.GROUP_PARENT.format('global_moderator')
+                twitchirc.GROUP_PARENT.format('global_moderator')
                 # 'parent.global_moderator'
             ],
             'bot_admin': [
-                irclib.GROUP_PARENT.format('staff')
+                twitchirc.GROUP_PARENT.format('staff')
                 # 'parent.staff'
             ]
         }
@@ -114,13 +114,13 @@ class PermissionList:
                     permissions.extend(self.groups[i.replace('parent.', '')])
                     was_extended = True
                     break
-                if irclib.GLOBAL_BYPASS_PERMISSION in permissions:
-                    return [irclib.GLOBAL_BYPASS_PERMISSION]
+                if twitchirc.GLOBAL_BYPASS_PERMISSION in permissions:
+                    return [twitchirc.GLOBAL_BYPASS_PERMISSION]
             if not was_extended:
                 break
         return permissions
 
-    def get_permission_state(self, message: irclib.ChannelMessage):
+    def get_permission_state(self, message: twitchirc.ChannelMessage):
         user = message.user
         group = auto_group(message)
 
@@ -131,11 +131,11 @@ class PermissionList:
         eff: typing.List[str] = self._get_permissions_from_parents(eff)
         eff.extend(self.users[user])
         eff: typing.List[str] = self._get_permissions_from_parents(eff)
-        # if 'irclib.bypass.permission' in eff:
-        #     return ['irclib.bypass.permission']
+        # if 'twitchirc.bypass.permission' in eff:
+        #     return ['twitchirc.bypass.permission']
         if group in ['moderator', 'broadcaster']:
-            eff.append(irclib.LOCAL_BYPASS_PERMISSION_TEMPLATE.format(message.channel))
-            # eff.append(f'irclib.bypass.permission.local.{message.channel}')
+            eff.append(twitchirc.LOCAL_BYPASS_PERMISSION_TEMPLATE.format(message.channel))
+            # eff.append(f'twitchirc.bypass.permission.local.{message.channel}')
         return eff
 
     def update(self, dict_: dict):

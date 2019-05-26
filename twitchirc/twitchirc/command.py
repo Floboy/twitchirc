@@ -1,6 +1,6 @@
 import typing
 
-import irclib
+import twitchirc
 
 Bot = typing.TypeVar('Bot')
 
@@ -16,7 +16,7 @@ class Command:
         self.forced_prefix = forced_prefix
         self.parent = parent
 
-    def __call__(self, message: irclib.ChannelMessage):
+    def __call__(self, message: twitchirc.ChannelMessage):
         if self.permissions_required:
             o = self.parent.check_permissions_from_command(message, self)
             if o:  # a non empty list of missing permissions.

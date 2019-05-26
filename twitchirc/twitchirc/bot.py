@@ -1,10 +1,10 @@
 import atexit
 import typing
 
-import irclib  # Import self.
+import twitchirc  # Import self.
 
 
-class Bot(irclib.Connection):
+class Bot(twitchirc.Connection):
     def run_commands_from_file(self, file_object):
         lines = file_object.readlines()
         user = 'rcfile'
@@ -16,7 +16,7 @@ class Bot(irclib.Connection):
                 elif i.startswith('@as'):
                     user = i.replace('@as ', '')
                 continue
-            m = irclib.ChannelMessage(user=user, channel=channel, text=i.replace('\n', ''))
+            m = twitchirc.ChannelMessage(user=user, channel=channel, text=i.replace('\n', ''))
             m.flags = {
                 'badge-info': '',
                 'badges': 'moderator/1',
@@ -37,14 +37,14 @@ class Bot(irclib.Connection):
         :param password: Password if needed.
         :param port: Irc port.
         :param no_connect: Don't connect to the chat straight away
-        :param storage: irclib.Storage compatible object to use as the storage.
+        :param storage: twitchirc.Storage compatible object to use as the storage.
         """
         super().__init__(address, port, no_atexit=True)
         if not no_connect:
             self.connect(username, password)
         self.username = username
         self._password = password
-        self.commands: typing.List[irclib.Command] = []
+        self.commands: typing.List[twitchirc.Command] = []
         self.handlers: typing.Dict[str, typing.List[typing.Callable]] = {
             'pre_disconnect': [],
             'post_disconnect': [],
@@ -90,7 +90,7 @@ class Bot(irclib.Connection):
         * warn - print a warning to stdout
         * chat_message - send a chat message saying that the command is invalid.
         """
-        self.permissions = irclib.PermissionList()
+        self.permissions = twitchirc.PermissionList()
         if no_atexit:
             @atexit.register
             def close_self():
@@ -101,8 +101,8 @@ class Bot(irclib.Connection):
 
     def add_command(self, command: str,
                     forced_prefix: typing.Optional[str] = None,
-                    enable_local_bypass: bool = True) -> typing.Callable[[typing.Callable[[irclib.ChannelMessage],
-                                                                                          typing.Any]], irclib.Command]:
+                    enable_local_bypass: bool = True) -> typing.Callable[[typing.Callable[[twitchirc.ChannelMessage],
+                                                                                          typing.Any]], twitchirc.Command]:
         # Im sorry if you are reading this definition
         # here's a better version
         #  -> ((typing.ChannelMessage) -> Any) -> Command
@@ -112,12 +112,12 @@ class Bot(irclib.Connection):
 
         :param command: Command to be registered.
         :param forced_prefix: Force a prefix to on this command. This is useful when you can change the prefix in the bot.
-        :param enable_local_bypass: If False this function will ignore the permissions `irclib.bypass.permission.local.*`. This is useful when creating a command that can change global settings.
+        :param enable_local_bypass: If False this function will ignore the permissions `twitchirc.bypass.permission.local.*`. This is useful when creating a command that can change global settings.
         :return: The `function` parameter. This is for using this as a decorator.
         """
 
-        def decorator(func: typing.Callable) -> irclib.Command:
-            cmd = irclib.Command(chat_command=command,
+        def decorator(func: typing.Callable) -> twitchirc.Command:
+            cmd = twitchirc.Command(chat_command=command,
                                  function=func, forced_prefix=forced_prefix, parent=self,
                                  enable_local_bypass=enable_local_bypass)
             self.commands.append(cmd)
@@ -125,14 +125,14 @@ class Bot(irclib.Connection):
 
         return decorator
 
-    def check_permissions(self, message: irclib.ChannelMessage, permissions: typing.List[str],
+    def check_permissions(self, message: twitchirc.ChannelMessage, permissions: typing.List[str],
                           enable_local_bypass=True):
         """
         Check if the user has the required permissions to run a command
 
         :param message: Message received.
         :param permissions: Permissions required.
-        :param enable_local_bypass: If False this function will ignore the permissions `irclib.bypass.permission.local.*`. This is useful when creating a command that can change global settings.
+        :param enable_local_bypass: If False this function will ignore the permissions `twitchirc.bypass.permission.local.*`. This is useful when creating a command that can change global settings.
         :return: A list of missing permissions.
 
         NOTE `permission_error` handlers are called if this function would return a non empty list.
@@ -142,8 +142,8 @@ class Bot(irclib.Connection):
             missing_permissions = permissions
         else:
             perms = self.permissions.get_permission_state(message)
-            if irclib.GLOBAL_BYPASS_PERMISSION in perms or \
-                    (enable_local_bypass and irclib.LOCAL_BYPASS_PERMISSION_TEMPLATE.format(message.channel) in perms):
+            if twitchirc.GLOBAL_BYPASS_PERMISSION in perms or \
+                    (enable_local_bypass and twitchirc.LOCAL_BYPASS_PERMISSION_TEMPLATE.format(message.channel) in perms):
                 return []
             for p in permissions:
                 if p not in perms:
@@ -152,8 +152,8 @@ class Bot(irclib.Connection):
             self.call_handlers('permission_error', message, None, missing_permissions)
         return missing_permissions
 
-    def check_permissions_from_command(self, message: irclib.ChannelMessage,
-                                       command: irclib.Command):
+    def check_permissions_from_command(self, message: twitchirc.ChannelMessage,
+                                       command: twitchirc.Command):
         """
         Check if the user has the required permissions to run a command
 
@@ -168,10 +168,10 @@ class Bot(irclib.Connection):
             missing_permissions = command.permissions_required
         else:
             perms = self.permissions.get_permission_state(message)
-            if irclib.GLOBAL_BYPASS_PERMISSION in perms or \
+            if twitchirc.GLOBAL_BYPASS_PERMISSION in perms or \
                     (
                             command.enable_local_bypass
-                            and (irclib.LOCAL_BYPASS_PERMISSION_TEMPLATE.format(message.channel) in perms)
+                            and (twitchirc.LOCAL_BYPASS_PERMISSION_TEMPLATE.format(message.channel) in perms)
                     ):
                 return []
             for p in command.permissions_required:
@@ -181,7 +181,7 @@ class Bot(irclib.Connection):
             self.call_handlers('permission_error', message, command, missing_permissions)
         return missing_permissions
 
-    def _call_command_handlers(self, message: irclib.ChannelMessage):
+    def _call_command_handlers(self, message: twitchirc.ChannelMessage):
         if message.text.startswith(self.prefix):
             was_handled = False
             if ' ' not in message.text:
@@ -192,7 +192,7 @@ class Bot(irclib.Connection):
                     was_handled = True
             if not was_handled:
                 if self.on_unknown_command == 'warn':
-                    irclib.warn(f'Unknown command {message!r}')
+                    twitchirc.warn(f'Unknown command {message!r}')
                 elif self.on_unknown_command == 'chat_message':
                     msg = message.reply(f'Unknown command {message.text.split(" ", 1)[0]!r}')
                     self.send(msg, msg.channel)
@@ -225,18 +225,18 @@ class Bot(irclib.Connection):
         while 1:
             if self.socket is None:  # self.disconnect() was called.
                 break
-            irclib.info('Receiving.')
+            twitchirc.info('Receiving.')
             self.receive()
-            irclib.info('Processing.')
+            twitchirc.info('Processing.')
             self.process_messages(100, mode=2)  # process all the messages.
-            irclib.info('Calling handlers.')
+            twitchirc.info('Calling handlers.')
             for i in self.receive_queue.copy():
-                irclib.info('<', repr(i))
+                twitchirc.info('<', repr(i))
                 self.call_handlers('any_msg', i)
-                if isinstance(i, irclib.PingMessage):
+                if isinstance(i, twitchirc.PingMessage):
                     self.force_send('PONG {}\r\n'.format(i.host))
                     continue
-                elif isinstance(i, irclib.ChannelMessage):
+                elif isinstance(i, twitchirc.ChannelMessage):
                     self.call_handlers('chat_msg', i)
                     self._call_command_handlers(i)
                 if i in self.receive_queue:  # this check may fail if self.part() was called.
@@ -247,7 +247,7 @@ class Bot(irclib.Connection):
 
     def call_handlers(self, event, *args):
         if event not in ['any_msg', 'chat_msg']:
-            irclib.info(f'Calling handlers for event {event!r} with args {args!r}')
+            twitchirc.info(f'Calling handlers for event {event!r} with args {args!r}')
         for h in self.handlers[event]:
             h(event, *args)
 
