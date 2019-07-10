@@ -118,8 +118,8 @@ class Connection:
 
         For sending a packet immediately use :py:meth:`force_send`.
 
-        :param queue: Queue name
         :param message: Message to be sent to the server.
+        :param queue: Queue name. This will be automaticcally overriden if the message is a ChannelMessage. It will be set to `message.channel`.
         :return: Nothing
         """
         if isinstance(message, twitchirc.ChannelMessage):
@@ -138,12 +138,13 @@ class Connection:
 
     def force_send(self, message: str):
         """
-        Sent a packet to be sent to the server without making the packet wait.
-        For queueing a packet use :py:meth:`send`.
+        Send a message immediately, without making it wait in the queue.
+        For queueing a message use :py:meth:`send`.
 
         :param message: Message to be sent to the server.
         :return: Nothing
         """
+        # Call it VIP queue if you wish. :)
         twitchirc.info('Force send message: {!r}'.format(message))
         self.queue['misc'].insert(0, to_bytes(message, 'utf-8'))
         self.flush_single_queue('misc', no_cooldown=True)
@@ -177,7 +178,7 @@ class Connection:
         return sent
 
     def receive(self):
-        """Return all messages that are waiting to be read."""
+        """Receive messages from the server and put them in the `receive_buffer`."""
         message = str(self.socket.recv(4096), 'utf-8', errors='ignore').replace('\r\n', '\n')
         # twitchirc.info(f'< {message!r}')
         if message == '':

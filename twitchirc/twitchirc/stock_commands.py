@@ -32,8 +32,8 @@ def get_no_permission_generator(bot: twitchirc.Bot):
 
 
 def get_perm_command(bot: twitchirc.Bot):
-    @twitchirc.require_permission(twitchirc.PERMISSION_COMMAND_PERM)
-    @bot.add_command(command='perm', forced_prefix=None, enable_local_bypass=True)
+    @bot.add_command(command='perm', forced_prefix=None, enable_local_bypass=True,
+                     required_permissions=[twitchirc.PERMISSION_COMMAND_PERM])
     def command_perm(msg: twitchirc.ChannelMessage):
         p = twitchirc.ArgumentParser(prog='!perm', add_help=False)
         g = p.add_mutually_exclusive_group(required=True)
@@ -93,16 +93,16 @@ def get_perm_command(bot: twitchirc.Bot):
 
 
 def get_quit_command(bot: twitchirc.Bot):
-    @twitchirc.require_permission(twitchirc.PERMISSION_COMMAND_QUIT)
-    @bot.add_command(command='quit', forced_prefix=None, enable_local_bypass=False)
+    @bot.add_command(command='quit', forced_prefix=None, enable_local_bypass=False,
+                     required_permissions=[twitchirc.PERMISSION_COMMAND_QUIT])
     def command_quit(msg: twitchirc.ChannelMessage):
         bot.send(msg.reply('Quitting.'))
         bot.stop()
 
 
 def get_part_command(bot: twitchirc.Bot):
-    @twitchirc.require_permission(twitchirc.PERMISSION_COMMAND_PART)
-    @bot.add_command(command='part', forced_prefix=None)
+    @bot.add_command(command='part', forced_prefix=None,
+                     required_permissions=[twitchirc.PERMISSION_COMMAND_PART])
     def command_part(msg: twitchirc.ChannelMessage):
         p = twitchirc.ArgumentParser(prog='!part', add_help=False)
         p.add_argument('channel', metavar='CHANNEL', nargs='?', const=msg.channel, default=msg.channel)
@@ -132,8 +132,8 @@ def get_part_command(bot: twitchirc.Bot):
 
 
 def get_join_command(bot: twitchirc.Bot):
-    @twitchirc.require_permission(twitchirc.PERMISSION_COMMAND_JOIN)
-    @bot.add_command(command='join', forced_prefix=None, enable_local_bypass=False)
+    @bot.add_command(command='join', forced_prefix=None, enable_local_bypass=False,
+                     required_permissions=[twitchirc.PERMISSION_COMMAND_JOIN])
     def command_join(msg: twitchirc.ChannelMessage):
         chan = msg.text.split(' ')[1].lower()
         if chan in ['all']:

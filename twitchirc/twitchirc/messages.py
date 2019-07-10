@@ -219,6 +219,26 @@ class NoticeMessage(Message):
         self.host = host
 
 
+class GlobalNoticeMessage(NoticeMessage):
+    @staticmethod
+    def from_match(m: typing.Match[str]):
+        new = GlobalNoticeMessage('')
+        new.host = m[1]
+        new.text = m[2]
+        return new
+
+    @staticmethod
+    def from_text(text):
+        m = re.match(twitchirc.GLOBAL_NOTICE_MESSAGE_PATTERN, text)
+        if m:
+            return GlobalNoticeMessage.from_match(m)
+        else:
+            raise Exception('Invalid GlobalNoticeMessage(NOTICE[...]*): {!r}'.format(text))
+
+    def __init__(self, text, host=None):
+        super().__init__(text, message_id=None, channel='*', host=host)
+
+
 class JoinMessage(Message):
     @staticmethod
     def from_match(m: typing.Match[str]):
@@ -274,6 +294,24 @@ class PartMessage(Message):
             return f'<{self.user} PART {self.channel}>'
 
 
+class UsernoticeMessage(Message):
+    @staticmethod
+    def from_match(m: typing.Match[str]):
+        new = UsernoticeMessage(m[1], m[2])
+        return new
+
+    def __repr__(self):
+        return f'UsernoticeMessage(flags={self.flags!r}, channel={self.channel!r})'
+
+    def __str__(self):
+        return f'<USERNOTICE {self.channel}>'
+
+    def __init__(self, flags, channel):
+        super().__init__(flags + ' ' + channel)
+        self.flags = flags
+        self.channel = channel
+
+
 MESSAGE_PATTERN_DICT: typing.Dict[str, typing.Union[
     typing.Type[ChannelMessage],
     typing.Type[PingMessage],
@@ -282,6 +320,7 @@ MESSAGE_PATTERN_DICT: typing.Dict[str, typing.Union[
     twitchirc.PRIVMSG_PATTERN_TWITCH: ChannelMessage,
     twitchirc.PING_MESSAGSE_PATTERN: PingMessage,
     twitchirc.NOTICE_MESSAGE_PATTERN: NoticeMessage,
+    twitchirc.GLOBAL_NOTICE_MESSAGE_PATTERN: GlobalNoticeMessage,
     twitchirc.JOIN_MESSAGE_PATTERN: JoinMessage,
     twitchirc.PART_MESSAGE_PATTERN: PartMessage
 }
@@ -295,12 +334,3 @@ def auto_message(message):
 
     # if nothing matches return generic irc message.
     return Message(message)
-
-    # if re.match(PRIVMSG_PATTERN_TWITCH, message):
-    #     return ChannelMessage(message)
-    # elif re.match(PING_MESSAGSE_PATTERN, message):
-    #     return PingMessage(message)
-    # elif re.match(NOTICE_MESSAGE_PATTERN, message):
-    #     return NoticeMessage(message)
-    # else:
-    #     return Message(message)

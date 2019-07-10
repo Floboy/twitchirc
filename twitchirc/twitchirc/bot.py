@@ -24,14 +24,16 @@ class Bot(twitchirc.Connection):
         lines = file_object.readlines()
         user = 'rcfile'
         channel = 'rcfile'
+        self._in_rc_mode = True
         for num, i in enumerate(lines):
+            i: str = i.replace('\n', '')
             if i.startswith('@'):
                 if i.startswith('@at'):
                     channel = i.replace('@at ', '')
                 elif i.startswith('@as'):
                     user = i.replace('@as ', '')
                 continue
-            m = twitchirc.ChannelMessage(user=user, channel=channel, text=i.replace('\n', ''))
+            m = twitchirc.ChannelMessage(user=user, channel=channel, text=i)
             m.flags = {
                 'badge-info': '',
                 'badges': 'moderator/1',
@@ -41,6 +43,7 @@ class Bot(twitchirc.Connection):
                 'emotes': ''
             }
             self._call_command_handlers(m)
+        self._in_rc_mode = False
 
     def __init__(self, address, username: str, password: typing.Union[str, None] = None, port: int = 6667,
                  no_connect=False, storage=None, no_atexit=False):
@@ -55,6 +58,7 @@ class Bot(twitchirc.Connection):
         :param storage: twitchirc.Storage compatible object to use as the storage.
         """
         super().__init__(address, port, no_atexit=True)
+        self._in_rc_mode = False
         if not no_connect:
             self.connect(username, password)
         self.username = username
@@ -116,11 +120,13 @@ class Bot(twitchirc.Connection):
 
     def add_command(self, command: str,
                     forced_prefix: typing.Optional[str] = None,
-                    enable_local_bypass: bool = True) -> typing.Callable[[typing.Callable[[twitchirc.ChannelMessage],
-                                                                                          typing.Any]], twitchirc.Command]:
+                    enable_local_bypass: bool = True,
+                    required_permissions: typing.List[str] = []) \
+            -> typing.Callable[[typing.Callable[[twitchirc.ChannelMessage],
+                                                typing.Any]], twitchirc.Command]:
         # Im sorry if you are reading this definition
         # here's a better version
-        #  -> ((typing.ChannelMessage) -> Any) -> Command
+        #  -> ((twitchirc.ChannelMessage) -> Any) -> Command
         """
         Add a command to the bot.
         This function is a decorator.
@@ -128,13 +134,15 @@ class Bot(twitchirc.Connection):
         :param command: Command to be registered.
         :param forced_prefix: Force a prefix to on this command. This is useful when you can change the prefix in the bot.
         :param enable_local_bypass: If False this function will ignore the permissions `twitchirc.bypass.permission.local.*`. This is useful when creating a command that can change global settings.
+        :param required_permissions: Permissions required to run this command.
         :return: The `function` parameter. This is for using this as a decorator.
         """
 
         def decorator(func: typing.Callable) -> twitchirc.Command:
             cmd = twitchirc.Command(chat_command=command,
-                                 function=func, forced_prefix=forced_prefix, parent=self,
-                                 enable_local_bypass=enable_local_bypass)
+                                    function=func, forced_prefix=forced_prefix, parent=self,
+                                    enable_local_bypass=enable_local_bypass)
+            cmd.permissions_required.extend(required_permissions)
             self.commands.append(cmd)
             return cmd
 
@@ -158,7 +166,8 @@ class Bot(twitchirc.Connection):
         else:
             perms = self.permissions.get_permission_state(message)
             if twitchirc.GLOBAL_BYPASS_PERMISSION in perms or \
-                    (enable_local_bypass and twitchirc.LOCAL_BYPASS_PERMISSION_TEMPLATE.format(message.channel) in perms):
+                    (enable_local_bypass
+                     and twitchirc.LOCAL_BYPASS_PERMISSION_TEMPLATE.format(message.channel) in perms):
                 return []
             for p in permissions:
                 if p not in perms:
@@ -225,6 +234,12 @@ class Bot(twitchirc.Connection):
                     handler(message)
 
     def run(self):
+        """
+        Connect to the server if not already connected. Process messages received.
+        This function includes a interrupt handler that automaticly calls :py:meth:`stop`.
+
+        :return: nothing.
+        """
         try:
             self._run()
         except KeyboardInterrupt:
@@ -250,6 +265,8 @@ class Bot(twitchirc.Connection):
                 self.call_handlers('any_msg', i)
                 if isinstance(i, twitchirc.PingMessage):
                     self.force_send('PONG {}\r\n'.format(i.host))
+                    if i in self.receive_queue:
+                        self.receive_queue.remove(i)
                     continue
                 elif isinstance(i, twitchirc.ChannelMessage):
                     self.call_handlers('chat_msg', i)
@@ -261,18 +278,58 @@ class Bot(twitchirc.Connection):
             self.flush_queue(max_messages=100)
 
     def call_handlers(self, event, *args):
+        """
+        Call handlers for `event`
+
+        :param event: The event that happened. See `handlers`
+        :param args: Arguments to give to the handler.
+
+        :return: nothing.
+        """
         if event not in ['any_msg', 'chat_msg']:
             twitchirc.info(f'Calling handlers for event {event!r} with args {args!r}')
         for h in self.handlers[event]:
             h(event, *args)
 
     def disconnect(self):
+        """
+        Disconnect from the server.
+
+        :return: nothing.
+        """
         self.call_handlers('pre_disconnect')
         super().disconnect()
         self.call_handlers('post_disconnect')
 
     def stop(self):
+        """
+        Stop the bot and disconnect.
+        This function force saves the `storage` and disconnects using :py:meth:`disconnect`
+
+        :return: nothing.
+        """
+        if self.socket is None:  # Already disconnected.
+            return
         self.call_handlers('pre_save')
         self.storage.save(is_auto_save=False)
         self.call_handlers('post_save')
         self.disconnect()
+
+    def send(self, message: typing.Union[str, twitchirc.ChannelMessage], queue='misc') -> None:
+        """
+        Send a message to the server.
+
+        :param message: message to send
+        :param queue: Queue for the message to be in. This will be automaticcally overriden if the message is a ChannelMessage. It will be set to `message.channel`.
+
+        :return: nothing
+
+        NOTE The message will not be sent instantely and this is intended. If you would send lots of messages Twitch will not forward any of them to the chat clients.
+        """
+        if self._in_rc_mode:
+            if isinstance(message, twitchirc.ChannelMessage):
+                twitchirc.log('rc', f'[OUT/{message.channel}, {queue}] {message.text}')
+            else:
+                twitchirc.log('rc', f'[OUT/?, {queue}] {message}')
+        else:
+            super().send(message, queue)

@@ -173,6 +173,13 @@ class PermissionList:
         for i in self.groups:
             yield f'group.{i}'
 
+    def __dict__(self):
+        output = {}
+        output.update(self.users)
+        for k, v in self.groups.items():
+            output[f'group.{k}'] = v
+
+
     def __getitem__(self, item):
         if item.startswith('group.'):
             return self.groups[item.replace('group.', '')]

@@ -18,6 +18,7 @@ import os
 import re
 import time
 
+quiet = False
 log_file = None
 log_file_name = ''
 log_file_counter = 0
@@ -28,6 +29,13 @@ log_rotate_delay = 1 * 24 * 60 * 60
 # * 60 minutes
 # * 60 seconds
 log_rotate_timestamp = time.time() + log_rotate_delay
+DISPLAY_LOG_LEVELS = {
+    'info': 'info',
+    'warn': 'warn',
+    'err': 'err',
+    'debug': 'debug'
+}
+LOG_FORMAT = '[{time}] [{level}] {message}\n'
 
 
 def remove_other_logs():
@@ -76,11 +84,14 @@ def rotate_logs():
 def log(level: str, *message: str, sep: str = ' '):
     if log_rotate_timestamp <= time.time():
         rotate_logs()
-    msg = f'[{datetime.datetime.now().strftime("%H:%M:%S")}] [{level}] {sep.join(message)}\n'
+    msg = LOG_FORMAT.format(time=datetime.datetime.now().strftime("%H:%M:%S"),
+                            level=DISPLAY_LOG_LEVELS[level],
+                            message=sep.join(message))
     if log_file:
         log_file.write(msg)
         log_file.flush()
-    print(msg, end='', flush=True)
+    if not quiet:
+        print(msg, end='', flush=True)
 
 
 def info(*message: str):
