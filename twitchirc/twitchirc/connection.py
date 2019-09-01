@@ -59,7 +59,7 @@ class Connection:
         self.hold_send = False
         self.channels_connected = []
         self.channels_to_remove = []
-        if no_atexit:
+        if not no_atexit:
             @atexit.register
             def close_self():
                 try:
@@ -210,7 +210,7 @@ class Connection:
         self._remove_parted_channels()
         messages_to_return = []
         messages_to_add_to_recv_queue = []
-        for i in range(max_messages):
+        for _ in range(max_messages):
             if '\n' not in self.receive_buffer:
                 break
             message = self.receive_buffer.split('\n', 1)[0]

@@ -1,3 +1,11 @@
+# Version 1.2
+ - Add docstrings to messages.py.
+ - Changed repr of Message.
+ - Added WhisperMessage.
+ - Added a scheduler to Bot.
+ - Added matcher_function field to Command.
+ - Fixed a bug in Connection.__init__ not registering the atexit close handler. 
+ - Changed regexes.
 # Version 1.1
  - changed version number to 1.1,
  - added required_permissions to Bot.add_command,

@@ -14,10 +14,10 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
-# DO NOT BEUTIFY THIS FILE
+# DO NOT BEAUTIFY THIS FILE
 from .patterns import *
 from .messages import ChannelMessage, PartMessage, Message, JoinMessage, NoticeMessage, PingMessage, auto_message, \
-    process_twitch_flags, PongMessage
+    process_twitch_flags, PongMessage, WhisperMessage
 from .connection import Connection
 from .command import Command
 from .bot import Bot

@@ -14,12 +14,20 @@
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import atexit
+import sched
+import select
 import typing
 
 import twitchirc  # Import self.
 
 
 class Bot(twitchirc.Connection):
+    def schedule_event(self, delay, priority, function, args: tuple, kwargs: dict):
+        return self.scheduler.enter(delay, priority, function, args, kwargs)
+
+    def schedule_repeated_event(self, time, priority, function, args: tuple, kwargs: dict):
+        return self.scheduler.enterabs(time, priority, function, args, kwargs)
+
     def run_commands_from_file(self, file_object):
         lines = file_object.readlines()
         user = 'rcfile'
@@ -58,6 +66,7 @@ class Bot(twitchirc.Connection):
         :param storage: twitchirc.Storage compatible object to use as the storage.
         """
         super().__init__(address, port, no_atexit=True)
+        self.scheduler = sched.scheduler()
         self._in_rc_mode = False
         if not no_connect:
             self.connect(username, password)
@@ -124,7 +133,7 @@ class Bot(twitchirc.Connection):
                     required_permissions: typing.List[str] = []) \
             -> typing.Callable[[typing.Callable[[twitchirc.ChannelMessage],
                                                 typing.Any]], twitchirc.Command]:
-        # Im sorry if you are reading this definition
+        # I'm sorry if you are reading this definition
         # here's a better version
         #  -> ((twitchirc.ChannelMessage) -> Any) -> Command
         """
@@ -132,8 +141,10 @@ class Bot(twitchirc.Connection):
         This function is a decorator.
 
         :param command: Command to be registered.
-        :param forced_prefix: Force a prefix to on this command. This is useful when you can change the prefix in the bot.
-        :param enable_local_bypass: If False this function will ignore the permissions `twitchirc.bypass.permission.local.*`. This is useful when creating a command that can change global settings.
+        :param forced_prefix: Force a prefix to on this command. This is useful when you can change the prefix in the
+        bot.
+        :param enable_local_bypass: If False this function will ignore the permissions
+        `twitchirc.bypass.permission.local.*`. This is useful when creating a command that can change global settings.
         :param required_permissions: Permissions required to run this command.
         :return: The `function` parameter. This is for using this as a decorator.
         """
@@ -155,7 +166,8 @@ class Bot(twitchirc.Connection):
 
         :param message: Message received.
         :param permissions: Permissions required.
-        :param enable_local_bypass: If False this function will ignore the permissions `twitchirc.bypass.permission.local.*`. This is useful when creating a command that can change global settings.
+        :param enable_local_bypass: If False this function will ignore the permissions
+        `twitchirc.bypass.permission.local.*`. This is useful when creating a command that can change global settings.
         :return: A list of missing permissions.
 
         NOTE `permission_error` handlers are called if this function would return a non empty list.
@@ -211,32 +223,41 @@ class Bot(twitchirc.Connection):
             if ' ' not in message.text:
                 message.text += ' '
             for handler in self.commands:
+                if callable(handler.matcher_function) and handler.matcher_function(message, handler):
+                    handler(message)
+                    was_handled = True
                 if message.text.startswith(self.prefix + handler.ef_command):
                     handler(message)
                     was_handled = True
             if not was_handled:
-                if self.on_unknown_command == 'warn':
-                    twitchirc.warn(f'Unknown command {message!r}')
-                elif self.on_unknown_command == 'chat_message':
-                    msg = message.reply(f'Unknown command {message.text.split(" ", 1)[0]!r}')
-                    self.send(msg, msg.channel)
-                elif self.on_unknown_command == 'ignore':
-                    # Just ignore it.
-                    pass
-                else:
-                    raise Exception('Invalid handler in `on_unknown_command`. Valid options: warn, chat_message, '
-                                    'ignore.')
+                self._do_unknown_command(message)
         else:
-            for handler in self.commands:
-                if handler.forced_prefix is None:
-                    continue
-                elif message.text.startswith(handler.ef_command):
-                    handler(message)
+            self._call_forced_prefix_commands(message)
+
+    def _call_forced_prefix_commands(self, message):
+        for handler in self.commands:
+            if handler.forced_prefix is None:
+                continue
+            elif message.text.startswith(handler.ef_command):
+                handler(message)
+
+    def _do_unknown_command(self, message):
+        if self.on_unknown_command == 'warn':
+            twitchirc.warn(f'Unknown command {message!r}')
+        elif self.on_unknown_command == 'chat_message':
+            msg = message.reply(f'Unknown command {message.text.split(" ", 1)[0]!r}')
+            self.send(msg, msg.channel)
+        elif self.on_unknown_command == 'ignore':
+            # Just ignore it.
+            pass
+        else:
+            raise Exception('Invalid handler in `on_unknown_command`. Valid options: warn, chat_message, '
+                            'ignore.')
 
     def run(self):
         """
         Connect to the server if not already connected. Process messages received.
-        This function includes a interrupt handler that automaticly calls :py:meth:`stop`.
+        This function includes an interrupt handler that automatically calls :py:meth:`stop`.
 
         :return: nothing.
         """
@@ -247,35 +268,49 @@ class Bot(twitchirc.Connection):
             self.stop()
             return
 
+    def _select_socket(self):
+        sel_output = select.select([self.socket], [], [], 0.1)
+        return bool(sel_output[0])
+
+    def _run_once(self):
+        if self.socket is None:  # self.disconnect() was called.
+            return False
+        if not self._select_socket():  # no data in socket, assume all messages where handled last time and return
+            return True
+        twitchirc.info('Receiving.')
+        self.receive()
+        twitchirc.info('Processing.')
+        self.process_messages(100, mode=2)  # process all the messages.
+        twitchirc.info('Calling handlers.')
+        for i in self.receive_queue.copy():
+            twitchirc.info('<', repr(i))
+            self.call_handlers('any_msg', i)
+            if isinstance(i, twitchirc.PingMessage):
+                self.force_send('PONG {}\r\n'.format(i.host))
+                if i in self.receive_queue:
+                    self.receive_queue.remove(i)
+                continue
+            elif isinstance(i, twitchirc.ChannelMessage):
+                self.call_handlers('chat_msg', i)
+                self._call_command_handlers(i)
+            if i in self.receive_queue:  # this check may fail if self.part() was called.
+                self.receive_queue.remove(i)
+        if not self.channels_connected:  # if the bot left every channel, stop processing messages.
+            return False
+        self.flush_queue(max_messages=100)
+        return True
+
     def _run(self):
         if self.socket is None:
             self.connect(self.username, self._password)
         self.hold_send = False
         self.call_handlers('start')
         while 1:
-            if self.socket is None:  # self.disconnect() was called.
+            if self._run_once() is False:
+                twitchirc.info('brk')
                 break
-            twitchirc.info('Receiving.')
-            self.receive()
-            twitchirc.info('Processing.')
-            self.process_messages(100, mode=2)  # process all the messages.
-            twitchirc.info('Calling handlers.')
-            for i in self.receive_queue.copy():
-                twitchirc.info('<', repr(i))
-                self.call_handlers('any_msg', i)
-                if isinstance(i, twitchirc.PingMessage):
-                    self.force_send('PONG {}\r\n'.format(i.host))
-                    if i in self.receive_queue:
-                        self.receive_queue.remove(i)
-                    continue
-                elif isinstance(i, twitchirc.ChannelMessage):
-                    self.call_handlers('chat_msg', i)
-                    self._call_command_handlers(i)
-                if i in self.receive_queue:  # this check may fail if self.part() was called.
-                    self.receive_queue.remove(i)
-            if not self.channels_connected:  # if the bot left every channel, stop processing messages.
-                break
-            self.flush_queue(max_messages=100)
+
+            self.scheduler.run()
 
     def call_handlers(self, event, *args):
         """
@@ -320,11 +355,13 @@ class Bot(twitchirc.Connection):
         Send a message to the server.
 
         :param message: message to send
-        :param queue: Queue for the message to be in. This will be automaticcally overriden if the message is a ChannelMessage. It will be set to `message.channel`.
+        :param queue: Queue for the message to be in. This will be automaticcally overriden if the message is a
+        ChannelMessage. It will be set to `message.channel`.
 
         :return: nothing
 
-        NOTE The message will not be sent instantely and this is intended. If you would send lots of messages Twitch will not forward any of them to the chat clients.
+        NOTE The message will not be sent instantely and this is intended. If you would send lots of messages Twitch
+        will not forward any of them to the chat clients.
         """
         if self._in_rc_mode:
             if isinstance(message, twitchirc.ChannelMessage):

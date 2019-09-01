@@ -36,13 +36,33 @@ def process_twitch_flags(flags) -> typing.Dict[str, typing.Union[str, typing.Lis
 class Message:
     @staticmethod
     def from_match(m: typing.Match[str]):
+        """
+        Create a new object using a match
+
+        :param m: Match
+        :return: The new object
+        """
         return Message(m.string)
 
     @staticmethod
     def from_text(text):
+        """
+        Create a new object from text
+
+        :param text: Text to create it from.
+        :return: The new object
+        """
         return Message(text)
 
     def __init__(self, args: str):
+        """
+        Message object.
+
+        WARNING: If you receive this object at runtime, that means that, the packet you received is not known to this
+        library
+
+        :param args: Text received.
+        """
         self._type = 'raw'
         self.args: str = args
         self.outgoing = False
@@ -54,7 +74,7 @@ class Message:
             return False
 
     def __repr__(self):
-        return f'RawMessage(args={self.args!r})'
+        return f'Message(args={self.args!r})'
 
     def __str__(self):
         return f'<Raw IRC message: {self.args!r}>'
@@ -66,14 +86,44 @@ class Message:
             return b''
 
 
+class WhisperMessage(Message):
+    @staticmethod
+    def from_match(m: typing.Match[str]):
+        flags = process_twitch_flags(m[1])
+        new = WhisperMessage(flags=flags, user_from=m[2], user_to=m[3], text=m[4])
+        return new
+
+    def __repr__(self):
+        return (f'WhisperMessage(flags={self.flags!r}, user_from={self.user_from!r}, user_to={self.user_to!r}, '
+                f'text={self.text!r})')
+
+    def __str__(self):
+        return f'{self.user_from} -> {self.user_to}: {self.text}'
+
+    def __bytes__(self):
+        if self.outgoing:
+            return bytes(f'PRIVMSG #jtv :/w {self.user_to} {self.text}\r\n', 'utf-8')
+        else:
+            return b''
+
+    def __init__(self, flags, user_from, user_to, text, outgoing=False):
+        super().__init__(f'{"Outgoing" if outgoing else ""} WHISPER from {user_from} to {user_to}: {text}')
+        self.text = text
+        self.user_to = user_to
+        self.user_from = user_from
+        self.flags = flags
+        self.outgoing = outgoing
+
+    def reply(self, text: str):
+        new = WhisperMessage(flags={}, user_from='OUTGOING', user_to=self.user_from, text=text, outgoing=True)
+        return new
+
+
 class ChannelMessage(Message):
     @staticmethod
     def from_match(m: typing.Match[str]):
         new = ChannelMessage(text=m[4], user=m[2], channel=m[3])
         new.flags = process_twitch_flags(m[1])
-        # new.user = m[2]
-        # new.channel = m[3]
-        # new.text = m[4]
         return new
 
     @staticmethod
@@ -135,6 +185,10 @@ class ChannelMessage(Message):
     def reply(self, text: str):
         new = ChannelMessage(text=text, user='OUTGOING', channel=self.channel)
         new.outgoing = True
+        return new
+
+    def reply_directly(self, text: str):
+        new = WhisperMessage(flags={}, user_from='OUTGOING', user_to=self.user, text=text, outgoing=True)
         return new
 
 
@@ -315,14 +369,20 @@ class UsernoticeMessage(Message):
 MESSAGE_PATTERN_DICT: typing.Dict[str, typing.Union[
     typing.Type[ChannelMessage],
     typing.Type[PingMessage],
-    typing.Type[NoticeMessage]]
+    typing.Type[NoticeMessage],
+    typing.Type[GlobalNoticeMessage],
+    typing.Type[JoinMessage],
+    typing.Type[PartMessage],
+    typing.Type[WhisperMessage],
+]
 ] = {
     twitchirc.PRIVMSG_PATTERN_TWITCH: ChannelMessage,
     twitchirc.PING_MESSAGSE_PATTERN: PingMessage,
     twitchirc.NOTICE_MESSAGE_PATTERN: NoticeMessage,
     twitchirc.GLOBAL_NOTICE_MESSAGE_PATTERN: GlobalNoticeMessage,
     twitchirc.JOIN_MESSAGE_PATTERN: JoinMessage,
-    twitchirc.PART_MESSAGE_PATTERN: PartMessage
+    twitchirc.PART_MESSAGE_PATTERN: PartMessage,
+    twitchirc.WHISPER_MESSAGE_PATTERN: WhisperMessage
 }
 
 

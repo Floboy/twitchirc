@@ -22,7 +22,10 @@ Bot = typing.TypeVar('Bot')
 
 class Command:
     def __init__(self, chat_command: str, function: typing.Callable, parent: Bot,
-                 forced_prefix: typing.Optional[str] = None, enable_local_bypass: bool = True):
+                 forced_prefix: typing.Optional[str] = None, enable_local_bypass: bool = True,
+                 matcher_function: typing.Optional[typing.Callable[[twitchirc.ChannelMessage,
+                                                                    typing.Any], bool]] = None):
+        self.matcher_function = matcher_function
         self.enable_local_bypass = enable_local_bypass
         self.ef_command = (forced_prefix + chat_command + ' ') if forced_prefix is not None else chat_command + ' '
         self.chat_command = chat_command
