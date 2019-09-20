@@ -25,8 +25,14 @@ class Bot(twitchirc.Connection):
     def schedule_event(self, delay, priority, function, args: tuple, kwargs: dict):
         return self.scheduler.enter(delay, priority, function, args, kwargs)
 
-    def schedule_repeated_event(self, time, priority, function, args: tuple, kwargs: dict):
+    def schedule_event_absolute(self, time, priority, function, args: tuple, kwargs: dict):
         return self.scheduler.enterabs(time, priority, function, args, kwargs)
+
+    def schedule_repeated_event(self, delay, priority, function, args: tuple, kwargs: dict):
+        def run_event():
+            function()
+            self.scheduler.enter(delay, priority, run_event, args, kwargs)
+        return self.scheduler.enter(delay, priority, run_event, args, kwargs)
 
     def run_commands_from_file(self, file_object):
         lines = file_object.readlines()
@@ -310,7 +316,7 @@ class Bot(twitchirc.Connection):
                 twitchirc.info('brk')
                 break
 
-            self.scheduler.run()
+            self.scheduler.run(blocking=False)
 
     def call_handlers(self, event, *args):
         """
