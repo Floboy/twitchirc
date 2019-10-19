@@ -296,6 +296,8 @@ class Bot(twitchirc.Connection):
                 if i in self.receive_queue:
                     self.receive_queue.remove(i)
                 continue
+            elif isinstance(i, twitchirc.ReconnectMessage):
+                return 'RECONNECT'
             elif isinstance(i, twitchirc.ChannelMessage):
                 self.call_handlers('chat_msg', i)
                 self._call_command_handlers(i)
@@ -312,10 +314,13 @@ class Bot(twitchirc.Connection):
         self.hold_send = False
         self.call_handlers('start')
         while 1:
-            if self._run_once() is False:
+            run_result = self._run_once()
+            if run_result is False:
                 twitchirc.info('brk')
                 break
-
+            if run_result == 'RECONNECT':
+                self.disconnect()
+                self.connect(self.username, self._password)
             self.scheduler.run(blocking=False)
 
     def call_handlers(self, event, *args):

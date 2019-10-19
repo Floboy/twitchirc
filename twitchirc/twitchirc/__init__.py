@@ -17,7 +17,7 @@
 # DO NOT BEAUTIFY THIS FILE
 from .patterns import *
 from .messages import ChannelMessage, PartMessage, Message, JoinMessage, NoticeMessage, PingMessage, auto_message, \
-    process_twitch_flags, PongMessage, WhisperMessage
+    process_twitch_flags, PongMessage, WhisperMessage, ReconnectMessage
 from .connection import Connection
 from .command import Command
 from .bot import Bot

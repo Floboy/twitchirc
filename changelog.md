@@ -1,3 +1,9 @@
+# Version 1.3
+ - Added secure option to [`Connection`](twitchirc/twitchirc/connection.py).
+ - Added [`RECONNECT_MESSAGE_PATTERN`](twitchirc/twitchirc/patterns.py) and [`ReconnectionMessage`](twitchirc/twitchirc/messages.py#L371).
+ - Implemented automatic reconnection in `Bot`, [here](twitchirc/twitchirc/bot.py#L299) and [here](twitchirc/twitchirc/bot.py#L321)
+ - Added automatic escaping of `/` and `.` to [`ChannelMessage.reply`](twitchirc/twitchirc/messages.py#L185)
+ 
 # Version 1.2
  - Add docstrings to messages.py.
  - Changed repr of Message.

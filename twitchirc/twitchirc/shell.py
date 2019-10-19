@@ -13,16 +13,3 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-from setuptools import setup
-
-setup(
-    name='twitchirc',
-    python_requires='>=3.6',
-    version='1.3',
-    packages=['twitchirc'],
-    url='',
-    license='GPLv3',
-    author='mm2pl',
-    author_email='',
-    description='Library for Twitch irc.'
-)

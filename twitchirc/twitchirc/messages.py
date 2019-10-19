@@ -183,6 +183,8 @@ class ChannelMessage(Message):
             return b''
 
     def reply(self, text: str):
+        if text.startswith(('.', '/')):
+            text = '/ ' + text
         new = ChannelMessage(text=text, user='OUTGOING', channel=self.channel)
         new.outgoing = True
         return new
@@ -366,6 +368,22 @@ class UsernoticeMessage(Message):
         self.channel = channel
 
 
+class ReconnectMessage(Message):
+    @staticmethod
+    def from_match(m: typing.Match[str]):
+        new = ReconnectMessage()
+        return new
+
+    def __repr__(self):
+        return f'ReconnectMessage()'
+
+    def __str__(self):
+        return f'<RECONNECT>'
+
+    def __init__(self):
+        super().__init__('RECONNECT')
+
+
 MESSAGE_PATTERN_DICT: typing.Dict[str, typing.Union[
     typing.Type[ChannelMessage],
     typing.Type[PingMessage],
@@ -374,6 +392,7 @@ MESSAGE_PATTERN_DICT: typing.Dict[str, typing.Union[
     typing.Type[JoinMessage],
     typing.Type[PartMessage],
     typing.Type[WhisperMessage],
+    typing.Type[ReconnectMessage]
 ]
 ] = {
     twitchirc.PRIVMSG_PATTERN_TWITCH: ChannelMessage,
@@ -382,7 +401,8 @@ MESSAGE_PATTERN_DICT: typing.Dict[str, typing.Union[
     twitchirc.GLOBAL_NOTICE_MESSAGE_PATTERN: GlobalNoticeMessage,
     twitchirc.JOIN_MESSAGE_PATTERN: JoinMessage,
     twitchirc.PART_MESSAGE_PATTERN: PartMessage,
-    twitchirc.WHISPER_MESSAGE_PATTERN: WhisperMessage
+    twitchirc.WHISPER_MESSAGE_PATTERN: WhisperMessage,
+    twitchirc.RECONNECT_MESSAGE_PATTERN: ReconnectMessage
 }
 
 

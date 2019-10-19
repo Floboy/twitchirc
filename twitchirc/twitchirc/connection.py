@@ -15,24 +15,11 @@
 
 import atexit
 import socket
+import ssl
 import time
 import typing
 
 import twitchirc  # Import self.
-
-
-def readuntil(buffer, char, max_size=1024):
-    m = ''
-    num = 0
-    while 1:
-        num += 1
-        if num >= max_size:
-            break
-        c = buffer.read(1)
-        if c == char:
-            break
-        m += c
-    return m
 
 
 def to_bytes(obj, encoding='utf-8'):
@@ -43,7 +30,8 @@ def to_bytes(obj, encoding='utf-8'):
 
 
 class Connection:
-    def __init__(self, address: str, port: int = 6667, message_cooldown: int = 3, no_atexit=False):
+    def __init__(self, address: str, port: int = 6667, message_cooldown: int = 3, no_atexit=False,
+                 secure: bool = False):
         self.message_cooldown: int = message_cooldown
         self.address: str = address
         self.port: int = port
@@ -51,7 +39,8 @@ class Connection:
         self.queue: typing.Dict[str, typing.List[bytes]] = {
             'misc': []
         }
-        self.receive_queue: typing.List[typing.Union[twitchirc.Message, twitchirc.ChannelMessage, twitchirc.PingMessage]] = []
+        self.receive_queue: typing.List[
+            typing.Union[twitchirc.Message, twitchirc.ChannelMessage, twitchirc.PingMessage]] = []
         self.receive_buffer: str = ''
         self.message_wait: typing.Dict[str, float] = {
             'misc': time.time()
@@ -59,6 +48,8 @@ class Connection:
         self.hold_send = False
         self.channels_connected = []
         self.channels_to_remove = []
+        self.secure = secure
+
         if not no_atexit:
             @atexit.register
             def close_self():
@@ -109,8 +100,14 @@ class Connection:
 
     def _connect(self):
         """Connect the IRC server."""
-        self.socket = socket.socket()
-        self.socket.connect((self.address, self.port))
+        if self.secure:
+            sock = socket.socket()
+            sock.connect((self.address, self.port))
+            self._ssl_context = ssl.create_default_context()
+            self.socket = self._ssl_context.wrap_socket(sock, server_hostname=self.address)
+        else:
+            self.socket = socket.socket()
+            self.socket.connect((self.address, self.port))
 
     def send(self, message: typing.Union[str, twitchirc.ChannelMessage], queue='misc') -> None:
         """
@@ -119,7 +116,8 @@ class Connection:
         For sending a packet immediately use :py:meth:`force_send`.
 
         :param message: Message to be sent to the server.
-        :param queue: Queue name. This will be automaticcally overriden if the message is a ChannelMessage. It will be set to `message.channel`.
+        :param queue: Queue name. This will be automatically overridden if the message is a ChannelMessage. It will
+        be set to `message.channel`.
         :return: Nothing
         """
         if isinstance(message, twitchirc.ChannelMessage):
@@ -132,6 +130,9 @@ class Connection:
             if queue not in self.queue:
                 self.queue[queue] = []
                 self.message_wait[queue] = time.time()
+            msg = to_bytes(message, 'utf-8')
+            if len(self.queue[queue]) and self.queue[queue][-1] == msg:
+                msg += bytes('\U0000e000', 'utf-8')
             self.queue[queue].append(to_bytes(message, 'utf-8'))
         else:
             twitchirc.info(f'Cannot queue message: {message!r}: Not connected.')
