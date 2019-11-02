@@ -62,6 +62,32 @@ def auto_group(message: twitchirc.ChannelMessage) -> str:
 
 class PermissionList:
     def __init__(self):
+        """
+        Class for storing permissions.
+
+        Group hierarchy:
+
+        .. code-block::
+
+            DEFAULT
+            |
+            +-- moderator LOCAL_BYPASS
+            |   |
+            |   +-- global_moderator BYPASS
+            |   |   |
+            |   |   +-- admin BYPASS
+            |   |       |
+            |   |       +-- staff BYPASS
+            |   |           |
+            |   |           +-- bot_admin BYPASS
+            |   |
+            |   +-- broadcaster LOCAL_BYPASS
+            |
+            +-- subscriber
+            |
+            +-- vip
+
+        """
         self.users = {
 
         }
@@ -136,6 +162,12 @@ class PermissionList:
         return permissions
 
     def get_permission_state(self, message: twitchirc.ChannelMessage):
+        """
+        Get state of a user's permissions.
+
+        :param message: Message that the user sent.
+        :return: List of permissions the user has.
+        """
         user = message.user
         group = auto_group(message)
 
@@ -146,14 +178,18 @@ class PermissionList:
         eff: typing.List[str] = self._get_permissions_from_parents(eff)
         eff.extend(self.users[user])
         eff: typing.List[str] = self._get_permissions_from_parents(eff)
-        # if 'twitchirc.bypass.permission' in eff:
-        #     return ['twitchirc.bypass.permission']
         if group in ['moderator', 'broadcaster']:
             eff.append(twitchirc.LOCAL_BYPASS_PERMISSION_TEMPLATE.format(message.channel))
             # eff.append(f'twitchirc.bypass.permission.local.{message.channel}')
         return eff
 
     def update(self, dict_: dict):
+        """
+        Update the permission list with entries from a dictionary. Keys have to be strings. Values have to be lists.
+        If a key begins with `group.` it will be treated as a group, not a user.
+
+        :return: nothing.
+        """
         for k, v in dict_.items():
             if k.startswith('group.'):
                 gn = k.replace('group.', '')
@@ -193,6 +229,7 @@ class PermissionList:
             self.users[key] = value
 
     def fix(self):
+        """Delete duplicate permissions."""
         for key in self:
             new = []
             for perm in self[key].copy():

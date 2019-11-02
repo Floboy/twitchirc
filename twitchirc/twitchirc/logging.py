@@ -49,17 +49,19 @@ def remove_other_logs():
             continue
 
 
-def enable_file_logging(filename: str, delay=1 * 24 * 60 * 60):
+def enable_file_logging(filename: str, rotation_delay=1 * 24 * 60 * 60):
+    """Enable logging to files."""
     global log_file, log_file_name, log_rotate_timestamp, log_rotate_delay
     log_file_name = filename
     remove_other_logs()
     log_file = open(filename, 'w')
-    log_rotate_delay = delay
+    log_rotate_delay = rotation_delay
     log_rotate_timestamp = time.time() + log_rotate_delay
     write_log_message()
 
 
 def write_log_message():
+    """Write the logging started message to file."""
     log_file.write(f'/*\n')
     log_file.write(f' * {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n')
     log_file.write(f' * Log file {log_file_name!r} (will be moved to {f"{log_file_name}.{log_file_counter}"!r})\n')
@@ -69,6 +71,7 @@ def write_log_message():
 
 
 def rotate_logs():
+    """Rotate logs."""
     global log_rotate_timestamp, log_file, log_file_counter
     log_rotate_timestamp = time.time() + log_rotate_delay
     if log_file is not None:
@@ -82,6 +85,7 @@ def rotate_logs():
 
 
 def log(level: str, *message: str, sep: str = ' '):
+    """Write a message to logs."""
     if log_rotate_timestamp <= time.time():
         rotate_logs()
     msg = LOG_FORMAT.format(time=datetime.datetime.now().strftime("%H:%M:%S"),
@@ -95,8 +99,10 @@ def log(level: str, *message: str, sep: str = ' '):
 
 
 def info(*message: str):
+    """Alias to log('info', *message)"""
     log('info', *message)
 
 
 def warn(*message: str):
+    """Alias to log('warn', *message)"""
     log('warn', *message)

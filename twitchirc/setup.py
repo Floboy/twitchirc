@@ -18,11 +18,11 @@ from setuptools import setup
 setup(
     name='twitchirc',
     python_requires='>=3.6',
-    version='1.3',
+    version='1.4',
     packages=['twitchirc'],
     url='',
     license='GPLv3',
     author='mm2pl',
     author_email='',
-    description='Library for Twitch irc.'
+    description='Unofficial library for Twitch irc.'
 )

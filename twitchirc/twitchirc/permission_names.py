@@ -13,6 +13,31 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+"""
+Names for permissions.
+
+:py:const:`LOCAL_BYPASS_PERMISSION_TEMPLATE` Template for local bypass permissions.
+
+:py:const:`GLOBAL_BYPASS_PERMISSION` Permission for bypassing every other
+
+:py:const:`PERMISSION_COMMAND_PERM` Permission for the stock !perm command.
+
+:py:const:`PERMISSION_COMMAND_PERM_ADD` Permission for adding permissions using !perm -a.
+
+:py:const:`PERMISSION_COMMAND_PERM_REMOVE` Permission for adding permissions using !perm -r.
+
+:py:const:`PERMISSION_COMMAND_PERM_LIST` Permission for adding permissions using !perm -l.
+
+:py:const:`PERMISSION_COMMAND_QUIT` Permission for the stock !quit command.
+
+:py:const:`PERMISSION_COMMAND_PART` Permission for the stock !part command.
+
+:py:const:`PERMISSION_COMMAND_PART_OTHER` Permission for parting other channels using the !part command.
+
+:py:const:`PERMISSION_COMMAND_JOIN` Permission for the stock !join command.
+
+:py:const:`GROUP_PARENT` Template for creating permissions for inheritance.
+"""
 LOCAL_BYPASS_PERMISSION_TEMPLATE = 'twitchirc.bypass.permission.local.{}'
 GLOBAL_BYPASS_PERMISSION = 'twitchirc.bypass.permission'
 

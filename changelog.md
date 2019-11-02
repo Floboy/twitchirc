@@ -1,3 +1,11 @@
+# Version 1.4
+ - major addition: docs,
+ - major addition: middleware,
+ - minor: logging changes
+ - major: changes in how Message s work.
+ - minor: patterns in MESSAGE_PATTERN_DICT are now compiled.
+ - minor: add shell.py a simple module to make experimenting easier.
+
 # Version 1.3
  - Added secure option to [`Connection`](twitchirc/twitchirc/connection.py).
  - Added [`RECONNECT_MESSAGE_PATTERN`](twitchirc/twitchirc/patterns.py) and [`ReconnectionMessage`](twitchirc/twitchirc/messages.py#L371).

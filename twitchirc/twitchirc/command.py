@@ -34,6 +34,17 @@ class Command:
                  matcher_function: typing.Optional[typing.Callable[[twitchirc.ChannelMessage,
                                                                     typing.Any], bool]] = None,
                  limit_to_channels: typing.Optional[typing.List[str]] = None):
+        """
+        Representation of a command.
+
+        :param chat_command: Text the command responds to.
+        :param function: Handler for the command.
+        :param parent: Bot parent.
+        :param forced_prefix: (optional) Forced prefix, if any.
+        :param enable_local_bypass: (default True) Allow bypassing of permissions by local moderators?
+        :param matcher_function: (optional) Custom function to test if this command should be executed.
+        :param limit_to_channels: (optional) Limit executions of the command to channels.
+        """
         self.matcher_function = matcher_function
         self.enable_local_bypass = enable_local_bypass
         self.ef_command = (forced_prefix + chat_command + ' ') if forced_prefix is not None else chat_command + ' '

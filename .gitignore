@@ -6,3 +6,5 @@ ignored/
 */dist/
 twitchirc/build/
 *__pycache__*
+docs/_build/*
+docs/_build/

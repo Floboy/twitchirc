@@ -20,9 +20,10 @@ import twitchirc
 
 
 def process_twitch_flags(flags) -> typing.Dict[str, typing.Union[str, typing.List[str]]]:
+    """Process Twitch's tags."""
     # @<key>=<value>;[...]
     flags = flags[1:].split(';')
-    # [<key>=<value>, [...]]
+    # ['<key>=<value>', [...]]
     output = {}
     for i in flags:
         i = i.split('=', 1)
@@ -45,16 +46,19 @@ class Message:
         return Message(m.string)
 
     @staticmethod
-    def from_text(text):
+    def from_text(text: str):
         """
         Create a new object from text
 
         :param text: Text to create it from.
         :return: The new object
         """
-        return Message(text)
+        new = Message('')
+        if text.startswith(':'):
+            new.source, new.action, new.args = text.split(' ', 2)
+        return new
 
-    def __init__(self, args: str):
+    def __init__(self, args: str, outgoing=False, source=None, action=''):
         """
         Message object.
 
@@ -63,17 +67,23 @@ class Message:
 
         :param args: Text received.
         """
-        self._type = 'raw'
+        self.action = action
+        self.source = source
         self.args: str = args
-        self.outgoing = False
+        self.outgoing = outgoing
 
     def __eq__(self, other):
         if isinstance(other, Message):
-            return other._type == self._type and other.args == self.args
+            return (other.args == self.args
+                    and other.__class__ == self.__class__
+                    and other.action == self.action
+                    and other.source == self.source)
         else:
             return False
 
     def __repr__(self):
+        if self.source is not None:
+            return f'Message(source={self.source!r}, action={self.action!r}, args={self.args!r})'
         return f'Message(args={self.args!r})'
 
     def __str__(self):
@@ -81,7 +91,9 @@ class Message:
 
     def __bytes__(self):
         if self.outgoing:
-            return self.args
+            if self.action:
+                return bytes(self.action + ' ' + self.args)
+            return bytes(self.args)
         else:
             return b''
 
@@ -107,12 +119,12 @@ class WhisperMessage(Message):
             return b''
 
     def __init__(self, flags, user_from, user_to, text, outgoing=False):
-        super().__init__(f'{"Outgoing" if outgoing else ""} WHISPER from {user_from} to {user_to}: {text}')
+        super().__init__(f'{"Outgoing" if outgoing else ""} WHISPER from {user_from} to {user_to}: {text}',
+                         outgoing=outgoing)
         self.text = text
         self.user_to = user_to
         self.user_from = user_from
         self.flags = flags
-        self.outgoing = outgoing
 
     def reply(self, text: str):
         new = WhisperMessage(flags={}, user_from='OUTGOING', user_to=self.user_from, text=text, outgoing=True)
@@ -162,8 +174,8 @@ class ChannelMessage(Message):
 
             return ChannelMessage(text=text, user=user, channel=channel)
 
-    def __init__(self, text: str, user: str, channel: str):
-        super().__init__(text)
+    def __init__(self, text: str, user: str, channel: str, outgoing=False):
+        super().__init__(text, outgoing=outgoing)
         self._type = 'PRIVMSG'
         self.flags = {}
         self.text: str = text.replace('\r\n', '')
@@ -211,6 +223,7 @@ class PingMessage(Message):
     def __init__(self, host: typing.Optional[str] = None):
         self.host = host
         super().__init__(str(self))
+        self.outgoing = False
 
     def __repr__(self):
         return 'PingMessage(host={!r})'.format(self.host)
@@ -234,6 +247,7 @@ class PongMessage(Message):
     def __init__(self, host):
         super().__init__(host)
         self.host = host
+        self.outgoing = True
 
     def __repr__(self):
         return 'PongMessage(host={!r})'.format(self.host)
@@ -302,10 +316,9 @@ class JoinMessage(Message):
         return new
 
     def __init__(self, user: str, channel: str, outgoing=False):
-        super().__init__('{} JOIN {}'.format(user, channel))
+        super().__init__('{} JOIN {}'.format(user, channel), outgoing=outgoing)
         self.user = user
         self.channel = channel
-        self.outgoing = outgoing
 
     def __repr__(self) -> str:
         if self.outgoing:
@@ -332,8 +345,8 @@ class PartMessage(Message):
         new = PartMessage(m[1], m[2])
         return new
 
-    def __init__(self, user: str, channel: str):
-        super().__init__('{} PART {}'.format(user, channel))
+    def __init__(self, user: str, channel: str, outgoing=False):
+        super().__init__(f'{user} PART {channel}', outgoing=outgoing)
         self.user = user
         self.channel = channel
 
@@ -348,6 +361,12 @@ class PartMessage(Message):
             return f'<PART {self.channel}>'
         else:
             return f'<{self.user} PART {self.channel}>'
+
+    def __bytes__(self):
+        if self.outgoing:
+            return bytes(f'PART #{self.channel}', 'utf-8')
+        else:
+            return b''
 
 
 class UsernoticeMessage(Message):
@@ -384,7 +403,7 @@ class ReconnectMessage(Message):
         super().__init__('RECONNECT')
 
 
-MESSAGE_PATTERN_DICT: typing.Dict[str, typing.Union[
+MESSAGE_PATTERN_DICT: typing.Dict[typing.Any, typing.Union[
     typing.Type[ChannelMessage],
     typing.Type[PingMessage],
     typing.Type[NoticeMessage],
@@ -395,14 +414,14 @@ MESSAGE_PATTERN_DICT: typing.Dict[str, typing.Union[
     typing.Type[ReconnectMessage]
 ]
 ] = {
-    twitchirc.PRIVMSG_PATTERN_TWITCH: ChannelMessage,
-    twitchirc.PING_MESSAGSE_PATTERN: PingMessage,
-    twitchirc.NOTICE_MESSAGE_PATTERN: NoticeMessage,
-    twitchirc.GLOBAL_NOTICE_MESSAGE_PATTERN: GlobalNoticeMessage,
-    twitchirc.JOIN_MESSAGE_PATTERN: JoinMessage,
-    twitchirc.PART_MESSAGE_PATTERN: PartMessage,
-    twitchirc.WHISPER_MESSAGE_PATTERN: WhisperMessage,
-    twitchirc.RECONNECT_MESSAGE_PATTERN: ReconnectMessage
+    re.compile(twitchirc.PRIVMSG_PATTERN_TWITCH): ChannelMessage,
+    re.compile(twitchirc.PING_MESSAGSE_PATTERN): PingMessage,
+    re.compile(twitchirc.NOTICE_MESSAGE_PATTERN): NoticeMessage,
+    re.compile(twitchirc.GLOBAL_NOTICE_MESSAGE_PATTERN): GlobalNoticeMessage,
+    re.compile(twitchirc.JOIN_MESSAGE_PATTERN): JoinMessage,
+    re.compile(twitchirc.PART_MESSAGE_PATTERN): PartMessage,
+    re.compile(twitchirc.WHISPER_MESSAGE_PATTERN): WhisperMessage,
+    re.compile(twitchirc.RECONNECT_MESSAGE_PATTERN): ReconnectMessage
 }
 
 
@@ -413,4 +432,4 @@ def auto_message(message):
             return v.from_match(m)
 
     # if nothing matches return generic irc message.
-    return Message(message)
+    return Message.from_text(message)

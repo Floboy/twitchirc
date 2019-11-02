@@ -30,10 +30,49 @@ def to_bytes(obj, encoding='utf-8'):
 
 
 class Connection:
+    def call_middleware(self, action, arguments, cancelable) -> typing.Union[bool, typing.Tuple[bool, typing.Any]]:
+        """
+        Call all middleware.
+
+        :param action: Action to run.
+        :param arguments: Arguments to give, depends on which action you use, for more info see AbstractMiddleware.
+        :param cancelable: Can the event be canceled?
+        :return: False if the event was canceled, True otherwise.
+        """
+        event = twitchirc.Event(action, arguments, source=self, cancelable=cancelable)
+        canceler: typing.Optional[twitchirc.AbstractMiddleware] = None
+        for m in self.middleware:
+            m.on_action(event)
+            if not canceler and event.canceled:
+                canceler = m
+        if event.canceled:
+            twitchirc.info(f'Event {action!r} was canceled by {canceler.__class__.__name__}.')
+            return False
+        if event.result is not None:
+            return True, event.result
+        return True
+
     def __init__(self, address: str, port: int = 6667, message_cooldown: int = 3, no_atexit=False,
                  secure: bool = False):
+        """
+        A bare-bones connection class.
+
+        :param address: Address to connect to.
+        :param port: Irc port.
+        :param no_atexit: Don't use atexit to automatically disconnect.
+        :param secure: Use a secure connection, SSL.
+        :param message_cooldown: Per-channel cooldown for messages.
+        """
+        self.middleware: typing.List[twitchirc.AbstractMiddleware] = []
+        """
+        Enabled middleware. Each entry in this list should be an instance of a subclass of \
+        :py:class:`twitchirc.AbstractMiddleware`
+        """
+
         self.message_cooldown: int = message_cooldown
+        """Per-channel cooldown for messages."""
         self.address: str = address
+        """Address to connect to."""
         self.port: int = port
         self.socket: typing.Union[socket.socket, None] = None
         self.queue: typing.Dict[str, typing.List[bytes]] = {
@@ -46,7 +85,10 @@ class Connection:
             'misc': time.time()
         }
         self.hold_send = False
+        """Stop sending messages for a bit, improper use of this may hang your program."""
+
         self.channels_connected = []
+        """All channels that the Connection is listening to."""
         self.channels_to_remove = []
         self.secure = secure
 
@@ -55,30 +97,68 @@ class Connection:
             def close_self():
                 try:
                     self.disconnect()
-                except:
-                    pass
+                    twitchirc.log('info', 'Automatic disconnect: ok.')
+                except Exception as e:
+                    twitchirc.log('info', f'Automatic disconnect: fail ({e})')
 
     def join(self, channel):
+        """
+        Join a channel.
+
+        :param channel: Channel you want to join.
+        :return: nothing.
+        """
         twitchirc.info('Joining channel {}'.format(channel))
+
+        o = self.call_middleware('join', dict(channel=channel), True)
+        if o is False:
+            return
+
         self.force_send('join #{}\r\n'.format(channel))
         self.queue[channel] = []
         self.message_wait[channel] = time.time()
         self.channels_connected.append(channel)
 
     def part(self, channel):
+        """
+        Leave a channel
+
+        :param channel: Channel you want to leave.
+        :return: nothing.
+        """
+        o = self.call_middleware('part', dict(channel=channel), cancelable=True)
+        if o is False:
+            return
         twitchirc.info(f'Departing from channel {channel}')
         self.force_send(f'part #{channel}\r\n')
         self.channels_to_remove.append(channel)
 
     def disconnect(self):
+        """
+        Disconnect from IRC.
+
+        :return: nothing.
+        """
+        self.call_middleware('disconnect', {}, cancelable=False)
+
         self.socket.send(b'quit\r\n')
         self.socket.shutdown(socket.SHUT_WR)
         self.socket.close()
         self.socket = None
 
     def twitch_mode(self):
-        twitchirc.info('Twitch mode enabled.')
-        self.force_send('CAP REQ :twitch.tv/commands twitch.tv/membership twitch.tv/tags\r\n')
+        self.cap_reqs()
+
+    def cap_reqs(self, use_membership=True):
+        """
+        Send CAP REQs.
+
+        :param use_membership: Send the membership capability.
+        :return: nothing.
+        """
+        twitchirc.info(f'Sending CAP REQs. Membership: {use_membership}')
+        self.force_send(f'CAP REQ :twitch.tv/commands twitch.tv/tags'
+                        f'{" twitch.tv/membership" if use_membership else ""}\r\n')
 
     def connect(self, username, password: typing.Union[str, None] = None) -> None:
         """
@@ -87,6 +167,7 @@ class Connection:
         :param username: Username that will be used.
         :param password: Password to be sent. If None the PASS packet will not be sent.
         """
+        self.call_middleware('connect', dict(username=username), cancelable=False)
         twitchirc.info('Connecting...')
         self._connect()
         twitchirc.info('Logging in...')
@@ -94,12 +175,23 @@ class Connection:
         twitchirc.info('OK.')
 
     def _login(self, username, password: typing.Union[str, None] = None):
+        """
+        Send NICK and PASS. For external use use :py:meth:`connect`.
+
+        :return: nothing.
+        """
         if password is not None:
             self.force_send('PASS {}\r\n'.format(password))
+        else:
+            self.force_send('PASS this_looks_like_a_password_ok?\r\n')
         self.force_send('NICK {}\r\n'.format(username))
 
     def _connect(self):
-        """Connect the IRC server."""
+        """
+        Connect to the IRC server. For external use use :py:meth:`connect`.
+
+        :return: nothing.
+        """
         if self.secure:
             sock = socket.socket()
             sock.connect((self.address, self.port))
@@ -116,10 +208,15 @@ class Connection:
         For sending a packet immediately use :py:meth:`force_send`.
 
         :param message: Message to be sent to the server.
-        :param queue: Queue name. This will be automatically overridden if the message is a ChannelMessage. It will
+        :param queue: Queue name. This will be automatically overridden if the message is a ChannelMessage. It will \
         be set to `message.channel`.
         :return: Nothing
         """
+        o = self.call_middleware('send', dict(message=message, queue=queue), cancelable=True)
+        if o is False:
+            twitchirc.info(str(message), ': canceled')
+            return
+
         if isinstance(message, twitchirc.ChannelMessage):
             if message.user == 'rcfile':
                 twitchirc.info(str(message))
@@ -146,16 +243,34 @@ class Connection:
         :return: Nothing
         """
         # Call it VIP queue if you wish. :)
+        o = self.call_middleware('send', dict(message=message, queue='__force_send__'), cancelable=True)
+        if o is False:
+            return
+        if isinstance(o, tuple):
+            message = o[1]
+
         twitchirc.info('Force send message: {!r}'.format(message))
         self.queue['misc'].insert(0, to_bytes(message, 'utf-8'))
         self.flush_single_queue('misc', no_cooldown=True)
 
     def _send(self, message: bytes):
+        """Send some data straight to the socket. If it is none do nothing."""
         if self.socket is None:
             return
         self.socket.send(message)
 
-    def flush_single_queue(self, queue, no_cooldown=False, max_messages=1, now=time.time()):
+    def flush_single_queue(self, queue, no_cooldown=False, max_messages=1, now=None):
+        """
+        Send waiting messages.
+
+        :param queue: Queue to flush.
+        :param no_cooldown: Don't wait for cooldowns.
+        :param max_messages: Maximum messages to send.
+        :param now: Current time.
+        :return: Number of messages sent.
+        """
+        if now is None:
+            now = time.time()
         if self.hold_send:
             return 0
         if self.message_wait[queue] > now and not no_cooldown:
@@ -170,6 +285,12 @@ class Connection:
         return sent
 
     def flush_queue(self, max_messages: int = 1) -> int:
+        """
+        Send waiting messages
+
+        :param max_messages: Maximum amount messages to send.
+        :return: Amount of messages sent.
+        """
         if self.hold_send:
             return 0
         sent = 0
@@ -179,7 +300,7 @@ class Connection:
         return sent
 
     def receive(self):
-        """Receive messages from the server and put them in the `receive_buffer`."""
+        """Receive messages from the server and put them in the :py:attr:`receive_buffer`."""
         message = str(self.socket.recv(4096), 'utf-8', errors='ignore').replace('\r\n', '\n')
         # twitchirc.info(f'< {message!r}')
         if message == '':
@@ -189,6 +310,11 @@ class Connection:
         self.receive_buffer += message
 
     def _remove_parted_channels(self):
+        """
+        Remove channels that have been parted when the respective queues got emptied.
+
+        :return: nothing.
+        """
         for i in self.channels_to_remove.copy():
             if not self.queue[i]:
                 self.channels_to_remove.remove(i)
@@ -199,10 +325,10 @@ class Connection:
         """
         Process the messages from self.receive_buffer
         Modes:
-           * -1 every message. Nothing goes to self.receive_queue.
-           *  0 chat messages. Other messages go to self.receive_queue.
-           *  1 other messages. Chat messages go to self.receive_queue.
-           *  2 do not return anything. Everything goes to self.receive_queue.
+        * -1 every message. Nothing goes to self.receive_queue.
+        * 0 chat messages. Other messages go to self.receive_queue.
+        * 1 other messages. Chat messages go to self.receive_queue.
+        * 2 do not return anything. Everything goes to self.receive_queue.
 
         :param max_messages: Maximum amount of messages to process.
         :param mode: What messages to return.
@@ -220,6 +346,10 @@ class Connection:
             if message == '':
                 continue
             m = twitchirc.auto_message(message)
+            o = self.call_middleware('receive', dict(message=m), True)
+            if o is False:
+                continue
+
             if isinstance(m, twitchirc.ChannelMessage):
                 if mode in [-1, 0]:
                     messages_to_return.append(m)

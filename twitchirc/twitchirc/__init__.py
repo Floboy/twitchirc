@@ -16,17 +16,18 @@
 
 # DO NOT BEAUTIFY THIS FILE
 from .patterns import *
-from .messages import ChannelMessage, PartMessage, Message, JoinMessage, NoticeMessage, PingMessage, auto_message, \
-    process_twitch_flags, PongMessage, WhisperMessage, ReconnectMessage
+from .messages import (ChannelMessage, PartMessage, Message, JoinMessage, NoticeMessage, PingMessage, auto_message,
+                       process_twitch_flags, PongMessage, WhisperMessage, ReconnectMessage)
+from .middleware import Event, AbstractMiddleware
 from .connection import Connection
 from .command import Command
 from .bot import Bot
 
 from .bot_storage import JsonStorage, CannotLoadError, AmbiguousSaveError
-from .logging import info, warn, log, log_file, log_rotate_delay, rotate_logs, enable_file_logging, LOG_FORMAT, \
-    DISPLAY_LOG_LEVELS
+from .logging import (info, warn, log, log_file, log_rotate_delay, rotate_logs, enable_file_logging, LOG_FORMAT,
+                      DISPLAY_LOG_LEVELS)
 from .permissions import require_permission, auto_group, PermissionList
 from .permission_names import *
-from .stock_commands import get_no_permission_generator, get_quit_command, get_part_command, get_join_command, \
-    get_perm_command
+from .stock_commands import (get_no_permission_generator, get_quit_command, get_part_command, get_join_command,
+                             get_perm_command)
 from .argument_parser import ArgumentParser
