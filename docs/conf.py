@@ -21,6 +21,7 @@ project = 'twitchirc'
 copyright = '2019, Mm2PL'
 author = 'Mm2PL'
 
+master_doc = 'index'
 
 # -- General configuration ---------------------------------------------------
 
