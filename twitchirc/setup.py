@@ -20,9 +20,9 @@ setup(
     python_requires='>=3.6',
     version='1.5',
     packages=['twitchirc'],
-    url='',
+    url='https://www.github.com/mm2pl/twitchirc',
     license='GPLv3',
     author='mm2pl',
-    author_email='',
+    author_email='u.y@o2.pl',
     description='Unofficial library for Twitch irc.'
 )
