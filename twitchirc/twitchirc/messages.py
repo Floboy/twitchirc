@@ -56,9 +56,11 @@ class Message:
         new = Message('')
         if text.startswith(':'):
             new.source, new.action, new.args = text.split(' ', 2)
+        else:
+            new.args = text
         return new
 
-    def __init__(self, args: str, outgoing=False, source=None, action=''):
+    def __init__(self, args: str, outgoing=False, source=None, action='', parent=None):
         """
         Message object.
 
@@ -71,6 +73,7 @@ class Message:
         self.source = source
         self.args: str = args
         self.outgoing = outgoing
+        self.parent = parent
 
     def __eq__(self, other):
         if isinstance(other, Message):
@@ -132,6 +135,12 @@ class WhisperMessage(Message):
 
 
 class ChannelMessage(Message):
+    def moderate(self):
+        if self.outgoing:
+            raise RuntimeError('Cannot moderate a message that\'s going to be sent.')
+
+        return twitchirc.ModerationContainer.from_message(self, self.parent)
+
     @staticmethod
     def from_match(m: typing.Match[str]):
         new = ChannelMessage(text=m[4], user=m[2], channel=m[3])
@@ -140,7 +149,6 @@ class ChannelMessage(Message):
 
     @staticmethod
     def from_text(text):
-
         m = re.match(twitchirc.PRIVMSG_PATTERN_TWITCH, text)
         if m:
             return ChannelMessage.from_match(m)
@@ -174,8 +182,8 @@ class ChannelMessage(Message):
 
             return ChannelMessage(text=text, user=user, channel=channel)
 
-    def __init__(self, text: str, user: str, channel: str, outgoing=False):
-        super().__init__(text, outgoing=outgoing)
+    def __init__(self, text: str, user: str, channel: str, outgoing=False, parent=None):
+        super().__init__(text, outgoing=outgoing, parent=parent)
         self._type = 'PRIVMSG'
         self.flags = {}
         self.text: str = text.replace('\r\n', '')
@@ -194,8 +202,8 @@ class ChannelMessage(Message):
         else:
             return b''
 
-    def reply(self, text: str):
-        if text.startswith(('.', '/')):
+    def reply(self, text: str, force_slash=False):
+        if not force_slash and text.startswith(('.', '/')):
             text = '/ ' + text
         new = ChannelMessage(text=text, user='OUTGOING', channel=self.channel)
         new.outgoing = True
@@ -425,11 +433,13 @@ MESSAGE_PATTERN_DICT: typing.Dict[typing.Any, typing.Union[
 }
 
 
-def auto_message(message):
+def auto_message(message, parent=None):
     for k, v in MESSAGE_PATTERN_DICT.items():
         m = re.match(k, message)
         if m:
-            return v.from_match(m)
+            new = v.from_match(m)
+            new.parent = parent
+            return new
 
     # if nothing matches return generic irc message.
     return Message.from_text(message)

@@ -98,8 +98,7 @@ class AbstractMiddleware(ABC):
             self.connect(event)
         elif event.name == 'add_command':
             self.add_command(event)
-        else:
-            raise RuntimeError(f'Unsupported action: {event.name}')
+        # ignore unknown events.
 
     @abstractmethod
     def send(self, event: Event) \
@@ -107,7 +106,8 @@ class AbstractMiddleware(ABC):
         """
         Called when sending a message.
 
-        :param event: Event given. Required data keys: 'message'(str, bytes or a Message), optional: 'queue' (default should be 'misc')
+        :param event: Event given. Required data keys: 'message'(str, bytes or a Message), optional: 'queue' (default \
+        should be 'misc')
         Result: nothing.
         :return: Nothing
         """
@@ -117,7 +117,7 @@ class AbstractMiddleware(ABC):
         """
         Called when receiving a message.
 
-        :param event: Event given. Required data keys: 'message', optional: none.
+        :param event: Event given. Required data keys: 'message', optional: none. \
         Result: nothing.
         :return: Nothing
         """
@@ -127,7 +127,7 @@ class AbstractMiddleware(ABC):
         """
         Called when a command is run.
 
-        :param event: Event given. Required data keys: 'message', 'command'.
+        :param event: Event given. Required data keys: 'message', 'command'. \
         Result: nothing.
         :return: Nothing
         """
@@ -137,7 +137,7 @@ class AbstractMiddleware(ABC):
         """
         Called when permissions need to be checked.
 
-        :param event: Event given. Required data keys: 'user', 'permissions', 'message', optional: 'command'
+        :param event: Event given. Required data keys: 'user', 'permissions', 'message', optional: 'command' \
         Result: Missing permissions
 
         :return: Nothing
@@ -148,7 +148,7 @@ class AbstractMiddleware(ABC):
         """
         Called when joining a channel.
 
-        :param event: Event given. Required data keys: 'channel'.
+        :param event: Event given. Required data keys: 'channel'. \
         Result: nothing.
         :return: Nothing
         """
@@ -158,7 +158,7 @@ class AbstractMiddleware(ABC):
         """
         Called when parting a channel.
 
-        :param event: Event given. Required data keys: 'channel'.
+        :param event: Event given. Required data keys: 'channel'. \
         Result: nothing.
         :return: Nothing
         """
@@ -168,7 +168,7 @@ class AbstractMiddleware(ABC):
         """
         Called when disconnecting from IRC.
 
-        :param event: Event given. Required data keys: none.
+        :param event: Event given. Required data keys: none. \
         Result: nothing.
         :return: Nothing
         """
@@ -178,7 +178,7 @@ class AbstractMiddleware(ABC):
         """
         Called when connecting to IRC.
 
-        :param event: Event given. Required data keys: 'username'.
+        :param event: Event given. Required data keys: 'username'. \
         Result: nothing.
         :return: Nothing
         """
@@ -188,7 +188,7 @@ class AbstractMiddleware(ABC):
         """
         Called when connecting to IRC.
 
-        :param event: Event given. Required data keys: 'command'.
+        :param event: Event given. Required data keys: 'command'. \
         Result: nothing.
         :return: Nothing
         """

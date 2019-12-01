@@ -12,12 +12,15 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
+import asyncio
 import sched
 import select
 import typing
+import traceback
 
 import twitchirc  # Import self.
+
+from .utils import _await_sync
 
 
 class Bot(twitchirc.Connection):
@@ -181,6 +184,13 @@ class Bot(twitchirc.Connection):
         * chat_message - send a chat message saying that the command is invalid.
         """
         self.permissions = twitchirc.PermissionList()
+        self.command_error_handler = None
+        """
+        A function to handle errors being raised.
+        
+        Called when a command fails.
+        """
+        self._tasks = []
 
     def add_command(self, command: str,
                     forced_prefix: typing.Optional[str] = None,
@@ -230,7 +240,7 @@ class Bot(twitchirc.Connection):
         `twitchirc.bypass.permission.local.*`. This is useful when creating a command that can change global settings.
         :return: A list of missing permissions.
 
-        NOTE `permission_error` handlers are called if this function would return a non empty list.
+        NOTE `permission_error` handlers are called if this function would return a non-empty list.
         """
         o = self.call_middleware('permission_check', dict(user=message.user, permissions=permissions,
                                                           message=message), cancelable=True)
@@ -265,7 +275,7 @@ class Bot(twitchirc.Connection):
         :param command: Command used.
         :return: A list of missing permissions.
 
-        NOTE `permission_error` handlers are called if this function would return a non empty list.
+        NOTE `permission_error` handlers are called if this function would return a non-empty list.
         """
         o = self.call_middleware('permission_check', dict(user=message.user, permissions=command.permissions_required,
                                                           message=message, command=command), cancelable=True)
@@ -293,7 +303,54 @@ class Bot(twitchirc.Connection):
             self.call_handlers('permission_error', message, command, missing_permissions)
         return missing_permissions
 
+    def _send_if_possible(self, message, source_message):
+        if isinstance(message, str):
+            self.send(source_message.reply(message))
+        elif isinstance(message, twitchirc.ChannelMessage):
+            self.send(message)
+
     def _call_command_handlers(self, message: twitchirc.ChannelMessage):
+        return _await_sync(self._acall_command_handlers(message))
+
+    async def _call_command(self, handler, message):
+        o = self.call_middleware('command', {'message': message, 'command': handler}, cancelable=True)
+        if o is False:
+            return
+        t = asyncio.create_task(handler.acall(message))
+        self._tasks.append({
+            'task': t,
+            'source_msg': message,
+            'command': handler
+        })
+        await self._a_wait_for_tasks()
+
+    async def _a_wait_for_tasks(self):
+        if not self._tasks:
+            return
+        done, _ = await asyncio.wait({i['task'] for i in self._tasks}, timeout=0.1)
+        # don't pause the bot for long unnecessarily.
+        for task in done:
+            t = None
+            for elem in self._tasks:
+                if elem['task'] == task:
+                    t = elem
+                    break
+            if t is not None:
+                try:
+                    result = await t['task']
+                except BaseException as e:
+
+                    for line in traceback.format_exc(1000).split('\n'):
+                        twitchirc.log('warn', line)
+
+                    if self.command_error_handler is not None:
+                        self.command_error_handler(e, t['command'], t['source_msg'])
+                    self._tasks.remove(t)
+                    continue
+                self._send_if_possible(result, t['source_msg'])
+                self._tasks.remove(t)
+
+    async def _acall_command_handlers(self, message: twitchirc.ChannelMessage):
         """Handle commands."""
         if message.text.startswith(self.prefix):
             was_handled = False
@@ -301,23 +358,26 @@ class Bot(twitchirc.Connection):
                 message.text += ' '
             for handler in self.commands:
                 if callable(handler.matcher_function) and handler.matcher_function(message, handler):
-                    handler(message)
+                    await self._call_command(handler, message)
                     was_handled = True
                 if message.text.startswith(self.prefix + handler.ef_command):
-                    handler(message)
+                    await self._call_command(handler, message)
                     was_handled = True
             if not was_handled:
                 self._do_unknown_command(message)
         else:
-            self._call_forced_prefix_commands(message)
+            await self._acall_forced_prefix_commands(message)
 
     def _call_forced_prefix_commands(self, message):
+        return _await_sync(self._acall_forced_prefix_commands(message))
+
+    async def _acall_forced_prefix_commands(self, message):
         """Handle commands with forced prefixes."""
         for handler in self.commands:
             if handler.forced_prefix is None:
                 continue
             elif message.text.startswith(handler.ef_command):
-                handler(message)
+                await self._call_command(handler, message)
 
     def _do_unknown_command(self, message):
         """Handle unknown commands."""
@@ -332,6 +392,22 @@ class Bot(twitchirc.Connection):
         else:
             raise Exception('Invalid handler in `on_unknown_command`. Valid options: warn, chat_message, '
                             'ignore.')
+
+    async def arun(self):
+        """
+        This is a coroutine version of :py:meth:`run`.
+
+        Connect to the server if not already connected. Process messages received.
+        This function includes an interrupt handler that automatically calls :py:meth:`stop`.
+
+        :return: nothing.
+        """
+        try:
+            await self._arun()
+        except KeyboardInterrupt:
+            print('Got SIGINT, exiting.')
+            self.stop()
+            return
 
     def run(self):
         """
@@ -352,7 +428,7 @@ class Bot(twitchirc.Connection):
         sel_output = select.select([self.socket], [], [], 0.1)
         return bool(sel_output[0])
 
-    def _run_once(self):
+    async def _run_once(self):
         """
         Do everything needed to run, but don't loop. This can be used as a non-blocking version of :py:meth:`run`.
 
@@ -379,7 +455,7 @@ class Bot(twitchirc.Connection):
                 return 'RECONNECT'
             elif isinstance(i, twitchirc.ChannelMessage):
                 self.call_handlers('chat_msg', i)
-                self._call_command_handlers(i)
+                await self._acall_command_handlers(i)
             if i in self.receive_queue:  # this check may fail if self.part() was called.
                 self.receive_queue.remove(i)
         if not self.channels_connected:  # if the bot left every channel, stop processing messages.
@@ -387,7 +463,7 @@ class Bot(twitchirc.Connection):
         self.flush_queue(max_messages=100)
         return True
 
-    def _run(self):
+    async def _arun(self):
         """
         Brains behind :py:meth:`run`. Doesn't include the `KeyboardInterrupt` handler.
 
@@ -398,7 +474,7 @@ class Bot(twitchirc.Connection):
         self.hold_send = False
         self.call_handlers('start')
         while 1:
-            run_result = self._run_once()
+            run_result = await self._run_once()
             if run_result is False:
                 twitchirc.info('brk')
                 break
@@ -406,6 +482,16 @@ class Bot(twitchirc.Connection):
                 self.disconnect()
                 self.connect(self.username, self._password)
             self.scheduler.run(blocking=False)
+            await self._a_wait_for_tasks()
+
+    def _run(self):
+        """
+        Runs :py:meth:`_arun`.
+
+        :return: nothing.
+        """
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(self._arun())
 
     def call_handlers(self, event, *args):
         """

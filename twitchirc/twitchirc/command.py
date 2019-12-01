@@ -12,18 +12,13 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-#
-#  You should have received a copy of the GNU General Public License
-#  along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+import inspect
 import typing
 
 import twitchirc
+
+from .utils import _await_sync
 
 Bot = typing.TypeVar('Bot')
 
@@ -56,10 +51,16 @@ class Command:
         self.limit_to_channels = limit_to_channels
 
     def __call__(self, message: twitchirc.ChannelMessage):
+        return _await_sync(self.acall(message))
+
+    async def acall(self, message: twitchirc.ChannelMessage):
         if self.permissions_required:
             o = self.parent.check_permissions_from_command(message, self)
             if o:  # a non-empty list of missing permissions.
                 return
         if self.limit_to_channels is not None and message.channel not in self.limit_to_channels:
             return
-        self.function(message)
+        if inspect.iscoroutinefunction(self.function):
+            return await self.function(message)
+        else:
+            return self.function(message)

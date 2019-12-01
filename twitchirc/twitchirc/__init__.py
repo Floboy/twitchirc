@@ -16,6 +16,7 @@
 
 # DO NOT BEAUTIFY THIS FILE
 from .patterns import *
+from .moderation import ModerationContainer
 from .messages import (ChannelMessage, PartMessage, Message, JoinMessage, NoticeMessage, PingMessage, auto_message,
                        process_twitch_flags, PongMessage, WhisperMessage, ReconnectMessage)
 from .middleware import Event, AbstractMiddleware

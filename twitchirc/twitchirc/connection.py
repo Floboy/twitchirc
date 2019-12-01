@@ -12,7 +12,6 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
 import atexit
 import socket
 import ssl
@@ -345,7 +344,7 @@ class Connection:
             # Remove `message` from the buffer.
             if message == '':
                 continue
-            m = twitchirc.auto_message(message)
+            m = twitchirc.auto_message(message, parent=self)
             o = self.call_middleware('receive', dict(message=m), True)
             if o is False:
                 continue
