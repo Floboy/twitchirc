@@ -1,3 +1,10 @@
+# Version 1.5
+ - major addition: async support,
+ - major addition: allow returning values from commands to send them,
+ - major addition: simple moderation features,
+ - minor addition: messages now have a link to the connection they came through,
+ - minor change: middleware will now ignore unknown events
+ 
 # Version 1.4
  - major addition: docs,
  - major addition: middleware,
@@ -18,7 +25,7 @@
  - Added WhisperMessage.
  - Added a scheduler to Bot.
  - Added matcher_function field to Command.
- - Fixed a bug in Connection.__init__ not registering the atexit close handler. 
+ - Fixed a bug in `Connection.__init__` not registering the atexit close handler. 
  - Changed regexes.
 # Version 1.1
  - changed version number to 1.1,
