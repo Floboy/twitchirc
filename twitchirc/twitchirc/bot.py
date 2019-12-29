@@ -438,13 +438,13 @@ class Bot(twitchirc.Connection):
             return False
         if not self._select_socket():  # no data in socket, assume all messages where handled last time and return
             return True
-        twitchirc.info('Receiving.')
+        twitchirc.log('debug', 'Receiving.')
         self.receive()
-        twitchirc.info('Processing.')
+        twitchirc.log('debug', 'Processing.')
         self.process_messages(100, mode=2)  # process all the messages.
-        twitchirc.info('Calling handlers.')
+        twitchirc.log('debug', 'Calling handlers.')
         for i in self.receive_queue.copy():
-            twitchirc.info('<', repr(i))
+            twitchirc.log('debug', '<', repr(i))
             self.call_handlers('any_msg', i)
             if isinstance(i, twitchirc.PingMessage):
                 self.force_send('PONG {}\r\n'.format(i.host))
@@ -476,7 +476,7 @@ class Bot(twitchirc.Connection):
         while 1:
             run_result = await self._run_once()
             if run_result is False:
-                twitchirc.info('brk')
+                twitchirc.log('debug', 'break')
                 break
             if run_result == 'RECONNECT':
                 self.disconnect()
@@ -503,7 +503,7 @@ class Bot(twitchirc.Connection):
         :return: nothing.
         """
         if event not in ['any_msg', 'chat_msg']:
-            twitchirc.info(f'Calling handlers for event {event!r} with args {args!r}')
+            twitchirc.log('debug', f'Calling handlers for event {event!r} with args {args!r}')
         for h in self.handlers[event]:
             h(event, *args)
 

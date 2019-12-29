@@ -45,7 +45,7 @@ class Connection:
             if not canceler and event.canceled:
                 canceler = m
         if event.canceled:
-            twitchirc.info(f'Event {action!r} was canceled by {canceler.__class__.__name__}.')
+            twitchirc.log('debug', f'Event {action!r} was canceled by {canceler.__class__.__name__}.')
             return False
         if event.result is not None:
             return True, event.result
@@ -107,7 +107,7 @@ class Connection:
         :param channel: Channel you want to join.
         :return: nothing.
         """
-        twitchirc.info('Joining channel {}'.format(channel))
+        twitchirc.log('debug', 'Joining channel {}'.format(channel))
 
         o = self.call_middleware('join', dict(channel=channel), True)
         if o is False:
@@ -128,7 +128,7 @@ class Connection:
         o = self.call_middleware('part', dict(channel=channel), cancelable=True)
         if o is False:
             return
-        twitchirc.info(f'Departing from channel {channel}')
+        twitchirc.log('debug', f'Departing from channel {channel}')
         self.force_send(f'part #{channel}\r\n')
         self.channels_to_remove.append(channel)
 
@@ -155,7 +155,7 @@ class Connection:
         :param use_membership: Send the membership capability.
         :return: nothing.
         """
-        twitchirc.info(f'Sending CAP REQs. Membership: {use_membership}')
+        twitchirc.log('debug', f'Sending CAP REQs. Membership: {use_membership}')
         self.force_send(f'CAP REQ :twitch.tv/commands twitch.tv/tags'
                         f'{" twitch.tv/membership" if use_membership else ""}\r\n')
 
@@ -169,9 +169,9 @@ class Connection:
         self.call_middleware('connect', dict(username=username), cancelable=False)
         twitchirc.info('Connecting...')
         self._connect()
-        twitchirc.info('Logging in...')
+        twitchirc.log('debug', 'Logging in...')
         self._login(username, password)
-        twitchirc.info('OK.')
+        twitchirc.log('debug', 'OK.')
 
     def _login(self, username, password: typing.Union[str, None] = None):
         """
@@ -213,7 +213,7 @@ class Connection:
         """
         o = self.call_middleware('send', dict(message=message, queue=queue), cancelable=True)
         if o is False:
-            twitchirc.info(str(message), ': canceled')
+            twitchirc.log('debug', str(message), ': canceled')
             return
 
         if isinstance(message, twitchirc.ChannelMessage):
@@ -222,7 +222,7 @@ class Connection:
                 return
             queue = message.channel
         if self.socket is not None or self.hold_send:
-            twitchirc.info('Queued message: {}'.format(message))
+            twitchirc.log('debug', 'Queued message: {}'.format(message))
             if queue not in self.queue:
                 self.queue[queue] = []
                 self.message_wait[queue] = time.time()
@@ -231,7 +231,7 @@ class Connection:
                 msg += bytes('\U0000e000', 'utf-8')
             self.queue[queue].append(to_bytes(message, 'utf-8'))
         else:
-            twitchirc.info(f'Cannot queue message: {message!r}: Not connected.')
+            twitchirc.warn(f'Cannot queue message: {message!r}: Not connected.')
 
     def force_send(self, message: str):
         """
@@ -248,7 +248,7 @@ class Connection:
         if isinstance(o, tuple):
             message = o[1]
 
-        twitchirc.info('Force send message: {!r}'.format(message))
+        twitchirc.log('debug', 'Force send message: {!r}'.format(message))
         self.queue['misc'].insert(0, to_bytes(message, 'utf-8'))
         self.flush_single_queue('misc', no_cooldown=True)
 
@@ -301,9 +301,8 @@ class Connection:
     def receive(self):
         """Receive messages from the server and put them in the :py:attr:`receive_buffer`."""
         message = str(self.socket.recv(4096), 'utf-8', errors='ignore').replace('\r\n', '\n')
-        # twitchirc.info(f'< {message!r}')
         if message == '':
-            twitchirc.log('WARN', 'Empty message')
+            twitchirc.log('warn', 'Empty message')
             self.disconnect()
             exit()
         self.receive_buffer += message
