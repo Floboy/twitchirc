@@ -1,3 +1,10 @@
+# Version 1.6
+ - major change: better reconnecting,
+ - minor addition: you can now return lists from commands, any object that can be sent will be,
+ - minor addition: new 'reconnect' middleware action, called when reconnecting.
+ - major change: `AbstractMiddleware` now doesn't inherit from `abc.ABC`, to make it easier to add new events.
+ - minor fix: `ModerationContainer.format_channel_mode()` crashed when run, now it doesn't
+
 # Version 1.5
  - major addition: async support,
  - major addition: allow returning values from commands to send them,

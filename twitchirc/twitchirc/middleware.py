@@ -12,7 +12,6 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-from abc import abstractmethod, ABC
 import typing
 
 
@@ -62,7 +61,7 @@ class Event:
 
 
 # noinspection PyUnusedLocal,PyMethodMayBeStatic
-class AbstractMiddleware(ABC):
+class AbstractMiddleware:
     def __init__(self):
         """Base middleware class for Connections and Bots"""
         pass
@@ -98,9 +97,10 @@ class AbstractMiddleware(ABC):
             self.connect(event)
         elif event.name == 'add_command':
             self.add_command(event)
+        elif event.name == 'reconnect':
+            self.reconnect(event)
         # ignore unknown events.
 
-    @abstractmethod
     def send(self, event: Event) \
             -> None:
         """
@@ -112,7 +112,6 @@ class AbstractMiddleware(ABC):
         :return: Nothing
         """
 
-    @abstractmethod
     def receive(self, event: Event) -> None:
         """
         Called when receiving a message.
@@ -122,7 +121,6 @@ class AbstractMiddleware(ABC):
         :return: Nothing
         """
 
-    @abstractmethod
     def command(self, event: Event) -> None:
         """
         Called when a command is run.
@@ -132,7 +130,6 @@ class AbstractMiddleware(ABC):
         :return: Nothing
         """
 
-    @abstractmethod
     def permission_check(self, event: Event) -> None:
         """
         Called when permissions need to be checked.
@@ -143,7 +140,6 @@ class AbstractMiddleware(ABC):
         :return: Nothing
         """
 
-    @abstractmethod
     def join(self, event: Event) -> None:
         """
         Called when joining a channel.
@@ -153,7 +149,6 @@ class AbstractMiddleware(ABC):
         :return: Nothing
         """
 
-    @abstractmethod
     def part(self, event: Event) -> None:
         """
         Called when parting a channel.
@@ -163,7 +158,6 @@ class AbstractMiddleware(ABC):
         :return: Nothing
         """
 
-    @abstractmethod
     def disconnect(self, event: Event) -> None:
         """
         Called when disconnecting from IRC.
@@ -173,7 +167,6 @@ class AbstractMiddleware(ABC):
         :return: Nothing
         """
 
-    @abstractmethod
     def connect(self, event: Event) -> None:
         """
         Called when connecting to IRC.
@@ -183,12 +176,19 @@ class AbstractMiddleware(ABC):
         :return: Nothing
         """
 
-    @abstractmethod
     def add_command(self, event: Event) -> None:
         """
         Called when connecting to IRC.
 
         :param event: Event given. Required data keys: 'command'. \
         Result: nothing.
+        :return: Nothing
+        """
+
+    def reconnect(self, event: Event) -> None:
+        """
+        Called when receiving a RECONNECT message from IRC or when getting kicked off.
+
+        :param event: Event given. Required data keys: none, Result: nothing.
         :return: Nothing
         """

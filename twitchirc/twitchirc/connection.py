@@ -20,6 +20,8 @@ import typing
 
 import twitchirc  # Import self.
 
+RECONNECT = 'RECONNECT'
+
 
 def to_bytes(obj, encoding='utf-8'):
     if isinstance(obj, str):
@@ -303,8 +305,7 @@ class Connection:
         message = str(self.socket.recv(4096), 'utf-8', errors='ignore').replace('\r\n', '\n')
         if message == '':
             twitchirc.log('warn', 'Empty message')
-            self.disconnect()
-            exit()
+            return RECONNECT
         self.receive_buffer += message
 
     def _remove_parted_channels(self):

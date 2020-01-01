@@ -19,6 +19,7 @@ import typing
 import traceback
 
 import twitchirc  # Import self.
+from .connection import RECONNECT
 
 from .utils import _await_sync
 
@@ -308,6 +309,9 @@ class Bot(twitchirc.Connection):
             self.send(source_message.reply(message))
         elif isinstance(message, twitchirc.ChannelMessage):
             self.send(message)
+        elif isinstance(message, list):
+            for item in message:
+                self._send_if_possible(item, source_message)
 
     def _call_command_handlers(self, message: twitchirc.ChannelMessage):
         return _await_sync(self._acall_command_handlers(message))
@@ -432,14 +436,16 @@ class Bot(twitchirc.Connection):
         """
         Do everything needed to run, but don't loop. This can be used as a non-blocking version of :py:meth:`run`.
 
-        :return: False if the bot should quit, True if everything went right, 'RECONNECT' if the bot needs to reconnect.
+        :return: False if the bot should quit, True if everything went right, RECONNECT if the bot needs to reconnect.
         """
         if self.socket is None:  # self.disconnect() was called.
             return False
         if not self._select_socket():  # no data in socket, assume all messages where handled last time and return
             return True
         twitchirc.log('debug', 'Receiving.')
-        self.receive()
+        o = self.receive()
+        if o == RECONNECT:
+            return RECONNECT
         twitchirc.log('debug', 'Processing.')
         self.process_messages(100, mode=2)  # process all the messages.
         twitchirc.log('debug', 'Calling handlers.')
@@ -452,7 +458,7 @@ class Bot(twitchirc.Connection):
                     self.receive_queue.remove(i)
                 continue
             elif isinstance(i, twitchirc.ReconnectMessage):
-                return 'RECONNECT'
+                return RECONNECT
             elif isinstance(i, twitchirc.ChannelMessage):
                 self.call_handlers('chat_msg', i)
                 await self._acall_command_handlers(i)
@@ -478,7 +484,8 @@ class Bot(twitchirc.Connection):
             if run_result is False:
                 twitchirc.log('debug', 'break')
                 break
-            if run_result == 'RECONNECT':
+            if run_result == RECONNECT:
+                self.call_middleware('reconnect', (), False)
                 self.disconnect()
                 self.connect(self.username, self._password)
             self.scheduler.run(blocking=False)
@@ -546,8 +553,8 @@ class Bot(twitchirc.Connection):
         """
         if self._in_rc_mode:
             if isinstance(message, twitchirc.ChannelMessage):
-                twitchirc.log('rc', f'[OUT/{message.channel}, {queue}] {message.text}')
+                twitchirc.log('info', f'[OUT/{message.channel}, {queue}] {message.text}')
             else:
-                twitchirc.log('rc', f'[OUT/?, {queue}] {message}')
+                twitchirc.log('info', f'[OUT/?, {queue}] {message}')
         else:
             super().send(message, queue)

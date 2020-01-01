@@ -207,10 +207,8 @@ class ModerationContainer:
                 text = (c_entry[settings[num] is not False]
                         .replace('{}',
                                  replacement))
-                commands.append(
-                    self.msg.reply(
-                        text,
-                        force_slash=True
-                    )
-                )
+                msg = twitchirc.ChannelMessage(text=text,
+                                               user='OUTGOING', outgoing=True,
+                                               channel=self.target_channel, parent=self.parent)
+                commands.append(msg)
         return commands
