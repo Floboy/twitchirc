@@ -19,8 +19,8 @@ import typing
 import traceback
 
 import twitchirc  # Import self.
-from .connection import RECONNECT
 
+from .connection import RECONNECT
 from .utils import _await_sync
 
 

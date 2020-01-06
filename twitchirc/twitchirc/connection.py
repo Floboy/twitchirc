@@ -102,6 +102,14 @@ class Connection:
                 except Exception as e:
                     twitchirc.log('info', f'Automatic disconnect: fail ({e})')
 
+    def moderate(self, channel: str, user: typing.Optional[str]=None, message_id: typing.Optional[str]=None):
+        """
+        Construct a ModerationContainer targeting the channel, and optionally a user and message.
+
+        :return: Newly created ModerationContainer
+        """
+        return twitchirc.ModerationContainer(message_id, user, channel, parent=self)
+
     def join(self, channel):
         """
         Join a channel.

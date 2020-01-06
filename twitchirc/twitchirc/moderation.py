@@ -84,8 +84,11 @@ class ModerationContainer:
 
         :return: ChannelMessage containing generated command.
         """
-        return twitchirc.ChannelMessage(user='OUTGOING', text=f'/delete {self.target_message_id}',
-                                        channel=self.target_channel, outgoing=True)
+        if self.target_message_id is not None:
+            return twitchirc.ChannelMessage(user='OUTGOING', text=f'/delete {self.target_message_id}',
+                                            channel=self.target_channel, outgoing=True)
+        else:
+            raise RuntimeError("This ModerationContainer doesn't target a message.")
 
     def timeout(self, time: typing.Union[int, str], reason: typing.Optional[str] = None):
         self.parent.send(self.format_timeout(time, reason))
@@ -98,11 +101,14 @@ class ModerationContainer:
         :param reason: Reason for this action.
         :return: ChannelMessage containing generated command.
         """
-        if (not time[-1].isalpha()) or time.isalpha():
+        if isinstance(time, str) and (not time[-1].isalpha()) or time.isalpha():
             raise ValueError('Time needs to be an int or string with the last character indicating the unit.')
-        return twitchirc.ChannelMessage(user='OUTGOING', text=f'/timeout {self.target_user} {time}'
-                                                              f'{f" {reason}" if reason is not None else ""}',
-                                        channel=self.target_channel, outgoing=True)
+        if self.target_user is not None:
+            return twitchirc.ChannelMessage(user='OUTGOING', text=f'/timeout {self.target_user} {time}'
+                                                                  f'{f" {reason}" if reason is not None else ""}',
+                                            channel=self.target_channel, outgoing=True)
+        else:
+            raise RuntimeError("This ModerationContainer doesn't target a user.")
 
     def purge(self, reason: typing.Optional[str] = None):
         self.parent.send(self.format_purge(reason))
@@ -114,7 +120,10 @@ class ModerationContainer:
         :param reason: Reason for this action.
         :return: ChannelMessage containing generated command.
         """
-        return self.format_timeout(1, reason)
+        if self.target_user is not None:
+            return self.format_timeout(1, reason)
+        else:
+            raise RuntimeError("This ModerationContainer doesn't target a user.")
 
     def permaban(self, reason: typing.Optional[str] = None):
         self.parent.send(self.format_permaban(reason))
@@ -126,9 +135,12 @@ class ModerationContainer:
         :param reason: Reason for this action.
         :return: ChannelMessage containing generated command.
         """
-        return twitchirc.ChannelMessage(user='OUTGOING', text=f'/ban {self.target_user}'
-                                                              f'{f" {reason}" if reason is not None else ""}',
-                                        channel=self.target_channel, outgoing=True)
+        if self.target_user is not None:
+            return twitchirc.ChannelMessage(user='OUTGOING', text=f'/ban {self.target_user}'
+                                                                  f'{f" {reason}" if reason is not None else ""}',
+                                            channel=self.target_channel, outgoing=True)
+        else:
+            raise RuntimeError("This ModerationContainer doesn't target a user.")
 
     def set_vip(self, status):
         self.parent.send(self.format_set_vip(status))
@@ -140,8 +152,11 @@ class ModerationContainer:
         :param status: New status for the user. True for vip, False for unvip.
         :return: ChannelMessage containing generated command.
         """
-        return twitchirc.ChannelMessage(user='OUTGOING', text=f'/{"un" if not status else ""}vip {self.target_user}',
-                                        channel=self.target_channel, outgoing=True)
+        if self.target_user is not None:
+            return twitchirc.ChannelMessage(user='OUTGOING', text=f'/{"un" if not status else ""}vip {self.target_user}',
+                                            channel=self.target_channel, outgoing=True)
+        else:
+            raise RuntimeError("This ModerationContainer doesn't target a user.")
 
     def set_mod(self, status):
         self.parent.send(self.format_set_mod(status))
@@ -153,8 +168,11 @@ class ModerationContainer:
         :param status: New status for the user. True for mod, False for unmod.
         :return: ChannelMessage containing generated command.
         """
-        return twitchirc.ChannelMessage(user='OUTGOING', text=f'/{"un" if not status else ""}mod {self.target_user}',
-                                        channel=self.target_channel, outgoing=True)
+        if self.target_user is not None:
+            return twitchirc.ChannelMessage(user='OUTGOING', text=f'/{"un" if not status else ""}mod {self.target_user}',
+                                            channel=self.target_channel, outgoing=True)
+        else:
+            raise RuntimeError("This ModerationContainer doesn't target a user.")
 
     def clear_channel(self):
         self.parent.send(self.format_clear_channel())
@@ -177,8 +195,11 @@ class ModerationContainer:
 
         :return: ChannelMessage containing generated command.
         """
-        return twitchirc.ChannelMessage(user='OUTGOING', text=f'/untimeout {self.target_user}',
-                                        channel=self.target_channel, outgoing=True)
+        if self.target_user is not None:
+            return twitchirc.ChannelMessage(user='OUTGOING', text=f'/untimeout {self.target_user}',
+                                            channel=self.target_channel, outgoing=True)
+        else:
+            raise RuntimeError("This ModerationContainer doesn't target a user.")
 
     # noinspection PyArgumentList
     def set_channel_mode(self, settings: ChannelSettings,

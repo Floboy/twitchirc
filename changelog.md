@@ -1,9 +1,12 @@
 # Version 1.6
  - major change: better reconnecting,
  - minor addition: you can now return lists from commands, any object that can be sent will be,
- - minor addition: new 'reconnect' middleware action, called when reconnecting.
- - major change: `AbstractMiddleware` now doesn't inherit from `abc.ABC`, to make it easier to add new events.
- - minor fix: `ModerationContainer.format_channel_mode()` crashed when run, now it doesn't
+ - minor addition: new 'reconnect' middleware action, called when reconnecting,
+ - major change: `AbstractMiddleware` now doesn't inherit from `abc.ABC`, to make it easier to add new events,
+ - minor fix: `ModerationContainer.format_channel_mode()` crashed when run, now it doesn't,
+ - minor addition: new `moderate()` method for `Connection`s and `Bot`s,
+ - minor change: `ModerationContainer`s can now not target a user and message,
+ - minor fix: `ModerationContainer.timeout()` now supports an `int` as the timeout length.
 
 # Version 1.5
  - major addition: async support,
@@ -34,6 +37,7 @@
  - Added matcher_function field to Command.
  - Fixed a bug in `Connection.__init__` not registering the atexit close handler. 
  - Changed regexes.
+
 # Version 1.1
  - changed version number to 1.1,
  - added required_permissions to Bot.add_command,
