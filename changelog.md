@@ -1,4 +1,4 @@
-# Unversioned
+# Version 1.7
  - minor change: `_arun` will now `await asyncio.sleep(0)` to give control to tasks in the background
  - minor change: username and password will now be stored in memory when calling `Connection.login()`
  - minor change: change a couple type hints
