@@ -102,7 +102,7 @@ class Connection:
                 except Exception as e:
                     twitchirc.log('info', f'Automatic disconnect: fail ({e})')
 
-    def moderate(self, channel: str, user: typing.Optional[str]=None, message_id: typing.Optional[str]=None):
+    def moderate(self, channel: str, user: typing.Optional[str] = None, message_id: typing.Optional[str] = None):
         """
         Construct a ModerationContainer targeting the channel, and optionally a user and message.
 
@@ -189,6 +189,8 @@ class Connection:
 
         :return: nothing.
         """
+        self.username = username
+        self._password = password
         if password is not None:
             self.force_send('PASS {}\r\n'.format(password))
         else:
@@ -243,7 +245,7 @@ class Connection:
         else:
             twitchirc.warn(f'Cannot queue message: {message!r}: Not connected.')
 
-    def force_send(self, message: str):
+    def force_send(self, message: typing.Union[str, twitchirc.Message]):
         """
         Send a message immediately, without making it wait in the queue.
         For queueing a message use :py:meth:`send`.
@@ -369,3 +371,16 @@ class Connection:
                     messages_to_add_to_recv_queue.append(m)
         self.receive_queue.extend(messages_to_add_to_recv_queue)
         return messages_to_return
+
+    def clone(self):
+        """Creates a new connection with the same auth"""
+        new = Connection(self.address, self.port, self.message_cooldown, secure=self.secure)
+        new.connect(self.username, self._password)
+        return new
+
+    def clone_and_send_batch(self, message_batch: typing.List[typing.Union[str, twitchirc.ChannelMessage]]):
+        """Creates a new connection with the same auth and queues all the provided messages."""
+        new = self.clone()
+        for i in message_batch:
+            new.send(i)
+        return new

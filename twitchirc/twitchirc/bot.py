@@ -490,6 +490,7 @@ class Bot(twitchirc.Connection):
                 self.connect(self.username, self._password)
             self.scheduler.run(blocking=False)
             await self._a_wait_for_tasks()
+            await asyncio.sleep(0)
 
     def _run(self):
         """

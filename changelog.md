@@ -1,3 +1,13 @@
+# Unversioned
+ - minor change: `_arun` will now `await asyncio.sleep(0)` to give control to tasks in the background
+ - minor change: username and password will now be stored in memory when calling `Connection.login()`
+ - minor change: change a couple type hints
+ - minor addition: new `clone()` and `clone_and_send_batch()` methods in `Connection`
+ - minor addition: new `raw_data` field in all `Message`s that stores the raw data received from the server
+ - minor change: better `__repr__` for `Message`
+ - minor change: delete old parsing code.
+ - major addition: new `UserstateMessage`
+
 # Version 1.6
  - major change: better reconnecting,
  - minor addition: you can now return lists from commands, any object that can be sent will be,
