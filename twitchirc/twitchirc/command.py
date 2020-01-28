@@ -28,7 +28,8 @@ class Command:
                  forced_prefix: typing.Optional[str] = None, enable_local_bypass: bool = True,
                  matcher_function: typing.Optional[typing.Callable[[twitchirc.ChannelMessage,
                                                                     typing.Any], bool]] = None,
-                 limit_to_channels: typing.Optional[typing.List[str]] = None):
+                 limit_to_channels: typing.Optional[typing.List[str]] = None,
+                 available_in_whispers: bool = True):
         """
         Representation of a command.
 
@@ -39,7 +40,9 @@ class Command:
         :param enable_local_bypass: (default True) Allow bypassing of permissions by local moderators?
         :param matcher_function: (optional) Custom function to test if this command should be executed.
         :param limit_to_channels: (optional) Limit executions of the command to channels.
+        :param available_in_whispers: (default True) Should the command be available in whispers?
         """
+        self.available_in_whispers = available_in_whispers
         self.matcher_function = matcher_function
         self.enable_local_bypass = enable_local_bypass
         self.ef_command = (forced_prefix + chat_command + ' ') if forced_prefix is not None else chat_command + ' '
@@ -49,17 +52,21 @@ class Command:
         self.forced_prefix = forced_prefix
         self.parent = parent
         self.limit_to_channels = limit_to_channels
+        self.no_whispers_message = 'This command is not available in whispers'
 
     def __call__(self, message: twitchirc.ChannelMessage):
         return _await_sync(self.acall(message))
 
-    async def acall(self, message: twitchirc.ChannelMessage):
+    async def acall(self, message: typing.Union[twitchirc.ChannelMessage, twitchirc.WhisperMessage]):
+        if (
+                (self.limit_to_channels is not None and message.channel not in self.limit_to_channels)
+                or (isinstance(message, twitchirc.WhisperMessage) and self.available_in_whispers is False)
+        ):
+            return self.no_whispers_message
         if self.permissions_required:
             o = self.parent.check_permissions_from_command(message, self)
             if o:  # a non-empty list of missing permissions.
                 return
-        if self.limit_to_channels is not None and message.channel not in self.limit_to_channels:
-            return
         if inspect.iscoroutinefunction(self.function):
             return await self.function(message)
         else:

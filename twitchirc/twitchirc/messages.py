@@ -137,6 +137,11 @@ class WhisperMessage(Message):
         self.user_to = user_to
         self.user_from = user_from
         self.flags = flags
+        self.channel = 'whispers'
+
+    @property
+    def user(self):
+        return self.user_from
 
     def reply(self, text: str):
         new = WhisperMessage(flags={}, user_from='OUTGOING', user_to=self.user_from, text=text, outgoing=True)

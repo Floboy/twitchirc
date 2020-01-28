@@ -1,3 +1,9 @@
+# Version 1.7.1
+ - addition: whisper commands
+ - minor fix: Make all `Message`s be imported into `__init__`
+ - minor addition: new `available_in_whispers` parameter for the `Command` constructor and for `Bot.add_command()`
+ - minor addition: `WhisperMessage`s will now "quack" like `ChannelMessage`s, added `channel`, `user` properties
+
 # Version 1.7
  - minor change: `_arun` will now `await asyncio.sleep(0)` to give control to tasks in the background
  - minor change: username and password will now be stored in memory when calling `Connection.login()`

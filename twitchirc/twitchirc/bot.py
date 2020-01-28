@@ -196,7 +196,9 @@ class Bot(twitchirc.Connection):
     def add_command(self, command: str,
                     forced_prefix: typing.Optional[str] = None,
                     enable_local_bypass: bool = True,
-                    required_permissions: typing.Optional[typing.List[str]] = None) \
+                    required_permissions: typing.Optional[typing.List[str]] = None,
+                    limit_to_channels: typing.Optional[typing.List[str]]=None,
+                    available_in_whispers: bool = True) \
             -> typing.Callable[[typing.Callable[[twitchirc.ChannelMessage],
                                                 typing.Any]], twitchirc.Command]:
         # I'm sorry if you are reading this definition
@@ -212,6 +214,8 @@ class Bot(twitchirc.Connection):
         :param enable_local_bypass: If False this function will ignore the permissions \
         `twitchirc.bypass.permission.local.*`. This is useful when creating a command that can change global settings.
         :param required_permissions: Permissions required to run this command.
+        :param limit_to_channels: (optional) Limit executions of the command to channels.
+        :param available_in_whispers: (default True) Should the command be available in whispers?
 
         This is a decorator.
         """
@@ -222,7 +226,9 @@ class Bot(twitchirc.Connection):
         def decorator(func: typing.Callable) -> twitchirc.Command:
             cmd = twitchirc.Command(chat_command=command,
                                     function=func, forced_prefix=forced_prefix, parent=self,
-                                    enable_local_bypass=enable_local_bypass)
+                                    enable_local_bypass=enable_local_bypass,
+                                    limit_to_channels=limit_to_channels,
+                                    available_in_whispers=available_in_whispers)
             cmd.permissions_required.extend(required_permissions)
             self.commands.append(cmd)
             self.call_middleware('add_command', (cmd,), cancelable=False)
@@ -354,7 +360,7 @@ class Bot(twitchirc.Connection):
                 self._send_if_possible(result, t['source_msg'])
                 self._tasks.remove(t)
 
-    async def _acall_command_handlers(self, message: twitchirc.ChannelMessage):
+    async def _acall_command_handlers(self, message: typing.Union[twitchirc.ChannelMessage, twitchirc.WhisperMessage]):
         """Handle commands."""
         if message.text.startswith(self.prefix):
             was_handled = False
@@ -461,6 +467,8 @@ class Bot(twitchirc.Connection):
                 return RECONNECT
             elif isinstance(i, twitchirc.ChannelMessage):
                 self.call_handlers('chat_msg', i)
+                await self._acall_command_handlers(i)
+            elif isinstance(i, twitchirc.WhisperMessage):
                 await self._acall_command_handlers(i)
             if i in self.receive_queue:  # this check may fail if self.part() was called.
                 self.receive_queue.remove(i)
