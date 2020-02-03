@@ -58,11 +58,11 @@ class Command:
         return _await_sync(self.acall(message))
 
     async def acall(self, message: typing.Union[twitchirc.ChannelMessage, twitchirc.WhisperMessage]):
-        if (
-                (self.limit_to_channels is not None and message.channel not in self.limit_to_channels)
-                or (isinstance(message, twitchirc.WhisperMessage) and self.available_in_whispers is False)
-        ):
-            return self.no_whispers_message
+        if (self.limit_to_channels is not None and message.channel not in self.limit_to_channels):
+            return
+        if isinstance(message, twitchirc.WhisperMessage) and self.available_in_whispers is False:
+            self.no_whispers_message
+
         if self.permissions_required:
             o = self.parent.check_permissions_from_command(message, self)
             if o:  # a non-empty list of missing permissions.
