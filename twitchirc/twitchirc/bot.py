@@ -464,6 +464,7 @@ class Bot(twitchirc.Connection):
                     self.receive_queue.remove(i)
                 continue
             elif isinstance(i, twitchirc.ReconnectMessage):
+                self.receive_queue.remove(i)
                 return RECONNECT
             elif isinstance(i, twitchirc.ChannelMessage):
                 self.call_handlers('chat_msg', i)

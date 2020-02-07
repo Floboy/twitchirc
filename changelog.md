@@ -1,3 +1,6 @@
+# Version 1.7.3
+ - fix spam reconnect bug
+
 # Version 1.7.1
  - addition: whisper commands
  - minor fix: Make all `Message`s be imported into `__init__`
