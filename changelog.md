@@ -1,3 +1,5 @@
+# Version 1.7.4
+ - smol bugfix
 # Version 1.7.3
  - fix spam reconnect bug
 
