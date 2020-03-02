@@ -92,6 +92,9 @@ class Connection:
         """All channels that the Connection is listening to."""
         self.channels_to_remove = []
         self.secure = secure
+        self.last_sent_messages: typing.Dict[str, str] = {
+            # 'channel': 'message text.'
+        }
 
         if not no_atexit:
             @atexit.register
@@ -233,14 +236,15 @@ class Connection:
                 twitchirc.info(str(message))
                 return
             queue = message.channel
+            if self.last_sent_messages[message.channel] == message.text:
+                message.text += '\U000e0000'
+                self.last_sent_messages[message.channel] = message.text
+
         if self.socket is not None or self.hold_send:
             twitchirc.log('debug', 'Queued message: {}'.format(message))
             if queue not in self.queue:
                 self.queue[queue] = []
                 self.message_wait[queue] = time.time()
-            msg = to_bytes(message, 'utf-8')
-            if len(self.queue[queue]) and self.queue[queue][-1] == msg:
-                msg += bytes('\U0000e000', 'utf-8')
             self.queue[queue].append(to_bytes(message, 'utf-8'))
         else:
             twitchirc.warn(f'Cannot queue message: {message!r}: Not connected.')

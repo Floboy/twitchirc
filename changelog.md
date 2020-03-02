@@ -1,3 +1,6 @@
+# Version 1.7.5
+ - Make avoiding duplicate messages work. Currently cannot disable this functionality or change the character.
+
 # Version 1.7.4
  - smol bugfix
 # Version 1.7.3
