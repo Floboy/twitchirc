@@ -1,3 +1,6 @@
+# Version 1.7.6
+ - Fix bug to do with duplicate messages.
+
 # Version 1.7.5
  - Make avoiding duplicate messages work. Currently cannot disable this functionality or change the character.
 

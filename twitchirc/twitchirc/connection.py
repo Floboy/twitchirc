@@ -236,9 +236,9 @@ class Connection:
                 twitchirc.info(str(message))
                 return
             queue = message.channel
-            if self.last_sent_messages[message.channel] == message.text:
+            if message.channel in self.last_sent_messages and self.last_sent_messages[message.channel] == message.text:
                 message.text += '\U000e0000'
-                self.last_sent_messages[message.channel] = message.text
+            self.last_sent_messages[message.channel] = message.text
 
         if self.socket is not None or self.hold_send:
             twitchirc.log('debug', 'Queued message: {}'.format(message))
