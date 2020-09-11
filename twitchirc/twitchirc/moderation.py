@@ -153,7 +153,8 @@ class ModerationContainer:
         :return: ChannelMessage containing generated command.
         """
         if self.target_user is not None:
-            return twitchirc.ChannelMessage(user='OUTGOING', text=f'/{"un" if not status else ""}vip {self.target_user}',
+            return twitchirc.ChannelMessage(user='OUTGOING',
+                                            text=f'/{"un" if not status else ""}vip {self.target_user}',
                                             channel=self.target_channel, outgoing=True)
         else:
             raise RuntimeError("This ModerationContainer doesn't target a user.")
@@ -169,7 +170,8 @@ class ModerationContainer:
         :return: ChannelMessage containing generated command.
         """
         if self.target_user is not None:
-            return twitchirc.ChannelMessage(user='OUTGOING', text=f'/{"un" if not status else ""}mod {self.target_user}',
+            return twitchirc.ChannelMessage(user='OUTGOING',
+                                            text=f'/{"un" if not status else ""}mod {self.target_user}',
                                             channel=self.target_channel, outgoing=True)
         else:
             raise RuntimeError("This ModerationContainer doesn't target a user.")
