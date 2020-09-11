@@ -101,7 +101,7 @@ class ModerationContainer:
         :param reason: Reason for this action.
         :return: ChannelMessage containing generated command.
         """
-        if isinstance(time, str) and (not time[-1].isalpha()) or time.isalpha():
+        if isinstance(time, str) and ((not time[-1].isalpha()) or time.isalpha()):
             raise ValueError('Time needs to be an int or string with the last character indicating the unit.')
         if self.target_user is not None:
             return twitchirc.ChannelMessage(user='OUTGOING', text=f'/timeout {self.target_user} {time}'

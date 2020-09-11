@@ -1,3 +1,7 @@
+# Version 1.7.7
+ - minor: Reformat moderation.py
+ - minor: Add a missing pair of parenthesis
+
 # Version 1.7.6
  - Fix bug to do with duplicate messages.
 
@@ -6,6 +10,7 @@
 
 # Version 1.7.4
  - smol bugfix
+
 # Version 1.7.3
  - fix spam reconnect bug
 
