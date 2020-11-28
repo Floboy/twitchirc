@@ -120,16 +120,17 @@ class Connection:
         :param channel: Channel you want to join.
         :return: nothing.
         """
-        twitchirc.log('debug', 'Joining channel {}'.format(channel))
-
+        channel = channel.lower().strip('#')
         o = self.call_middleware('join', dict(channel=channel), True)
         if o is False:
             return
 
-        self.force_send('join #{}\r\n'.format(channel))
+        twitchirc.log('debug', 'Joining channel {}'.format(channel))
+        self.force_send(f'JOIN #{channel}\r\n')
         self.queue[channel] = []
         self.message_wait[channel] = time.time()
-        self.channels_connected.append(channel)
+        if channel not in self.channels_connected:
+            self.channels_connected.append(channel)
 
     def part(self, channel):
         """
@@ -138,12 +139,19 @@ class Connection:
         :param channel: Channel you want to leave.
         :return: nothing.
         """
+        channel = channel.lower().strip('#')
+
         o = self.call_middleware('part', dict(channel=channel), cancelable=True)
         if o is False:
             return
+
         twitchirc.log('debug', f'Departing from channel {channel}')
-        self.force_send(f'part #{channel}\r\n')
+        self.force_send(f'PART #{channel}\r\n')
+
         self.channels_to_remove.append(channel)
+
+        while channel in self.channels_connected:
+            self.channels_connected.remove(channel)
 
     def disconnect(self):
         """

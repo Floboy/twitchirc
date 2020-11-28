@@ -1,3 +1,6 @@
+# Version 1.7.8
+ - major fix: `channels_connected` will now have channels removed from it and no duplicates should be generated
+
 # Version 1.7.7
  - minor: Reformat moderation.py
  - minor: Add a missing pair of parenthesis
