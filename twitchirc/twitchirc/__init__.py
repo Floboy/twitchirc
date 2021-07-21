@@ -15,11 +15,10 @@
 
 
 # DO NOT BEAUTIFY THIS FILE
-from .patterns import *
 from .moderation import ModerationContainer
 from .messages import (ChannelMessage, PartMessage, Message, JoinMessage, NoticeMessage, PingMessage, auto_message,
-                       process_twitch_flags, PongMessage, WhisperMessage, ReconnectMessage, UserstateMessage,
-                       UsernoticeMessage, GlobalNoticeMessage)
+                       PongMessage, WhisperMessage, ReconnectMessage, UserstateMessage,
+                       UsernoticeMessage)
 from .middleware import Event, AbstractMiddleware
 from .connection import Connection
 from .command import Command

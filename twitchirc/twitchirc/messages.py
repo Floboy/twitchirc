@@ -12,56 +12,103 @@
 #
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-import re
 import typing
+import warnings
 
 import twitchirc
 
 
-def process_twitch_flags(flags) -> typing.Dict[str, typing.Union[str, typing.List[str]]]:
-    """Process Twitch's tags."""
-    # @<key>=<value>;[...]
-    flags = flags[1:].split(';')
-    # ['<key>=<value>', [...]]
-    output = {}
-    for i in flags:
-        i = i.split('=', 1)
-        val = i[1]
-        if ',' in val:
-            val = val.split(',')
-        output[i[0]] = val
-    return output
-
-
 class Message:
-    @staticmethod
-    def from_match(m: typing.Match[str]):
+    @classmethod
+    def from_match(cls, m: typing.Match[str]):
         """
         Create a new object using a match
 
         :param m: Match
         :return: The new object
         """
-        return Message(m.string)
+        warnings.warn(DeprecationWarning('from_match is deprecated'))
+        return cls.upgrade(Message.from_text(m.string))
 
-    @staticmethod
-    def from_text(text: str):
+    @classmethod
+    def from_text(cls, text: str):
+        msg = cls.parse_text(text)
+        return cls.upgrade(msg)
+
+    @classmethod
+    def _unescape_tag_value(cls, text: str) -> str:
+        return (
+            text.replace('\:', ';')
+                .replace('\\r', '\r')
+                .replace('\\n', '\n')
+                .replace('\\s', ' ')
+                .replace(r'\\', '\\')
+        )
+
+    @classmethod
+    def _escape_tag_value(cls, text: str) -> str:
+        return (
+            text.replace(';', '\:')
+                .replace(' ', '\s')
+                .replace('\r', '\\r')
+                .replace('\n', '\\n')
+                .replace('\\', '\\\\')
+        )
+
+    @classmethod
+    def parse_text(cls, text: str):
         """
         Create a new object from text
 
         :param text: Text to create it from.
         :return: The new object
         """
-        new = Message('')
-        new.raw_data = text
-        if text.startswith(':'):
-            new.source, new.action, new.args = text.split(' ', 2)
-        else:
-            new.args = text
-        return new
+        # @a=b;c=d :%s!%s@%s PRIVMSG #channel :text
+        original_text = text
+        prefix = None
+        tags = {}
+        if text.startswith('@'):
+            # msg has tags
+            tags_raw, text = text.split(' ', 1)
+            tags_raw = tags_raw[1:].split(';')
+            for pair in tags_raw:
+                k, v = pair.split('=', 1)
+                tags[k] = cls._unescape_tag_value(v)
 
-    def __init__(self, args: str, outgoing=False, source=None, action='', parent=None, raw_data=None):
+        if text.startswith(':'):
+            # message has a prefix
+            prefix, text = text.split(' ', 1)
+            prefix = prefix[1:]  # remove :
+
+        if ' ' in text:
+            command, text = text.split(' ', 1)
+            params = []
+            words = text.split(' ')
+            for i, word in enumerate(words):
+                word: str
+                if word.startswith(':'):
+                    # trailing
+                    params.append(' '.join([word[1:]] + words[i + 1:]))
+                    break
+                else:
+                    params.append(word)
+        else:
+            command = text
+            params = []
+
+        return Message(
+            params,
+            outgoing=False,
+            source=prefix,
+            action=command,
+            parent=None,
+            raw_data=original_text,
+            flags=tags
+        )
+
+    def __init__(self, args: typing.Union[str, typing.List[str]], outgoing=False, source=None, action='', parent=None,
+                 raw_data=None,
+                 flags: typing.Dict[str, str] = None):
         """
         Message object.
 
@@ -72,14 +119,28 @@ class Message:
         """
         self.action = action
         self.source = source
-        self.args: str = args
+        if isinstance(args, list):
+            self.new_args: typing.List[str] = args
+            self.args = ''
+            if args:
+                for i, arg in enumerate(args):
+                    if i == len(args) - 1:
+                        self.args += ':' + arg
+                    else:
+                        self.args += arg + ' '
+                self.args = self.args.rstrip(' ')
+        else:
+            self.args = args
+            self.new_args = args.split(' ')
+
         self.outgoing = outgoing
         self.parent = parent
         self.raw_data = raw_data
+        self.flags = flags or {}
 
     def __eq__(self, other):
         if isinstance(other, Message):
-            return (other.args == self.args
+            return (other.new_args == self.new_args
                     and other.__class__ == self.__class__
                     and other.action == self.action
                     and other.source == self.source)
@@ -88,33 +149,77 @@ class Message:
 
     def __repr__(self):
         if self.source is not None:
-            return f'Message(source={self.source!r}, action={self.action!r}, args={self.args!r})'
+            return f'{self.__class__.__name__}(source={self.source!r}, action={self.action!r}, args={self.new_args!r})'
         elif self.args:
-            return f'Message(args={self.args!r})'
+            return f'{self.__class__.__name__}(args={self.new_args!r})'
         elif self.raw_data:
-            return f'Message(raw_data={self.raw_data!r})'
+            return f'{self.__class__.__name__}(raw_data={self.raw_data!r})'
         else:
-            return (f'Message({self.args!r}, source={self.source!r}, action={self.action!r}, '
+            return (f'{self.__class__.__name__}({self.args!r}, source={self.source!r}, action={self.action!r}, '
                     f'raw_data={self.raw_data!r})')
 
     def __str__(self):
-        return f'<Raw IRC message: {self.args!r}>'
+        return f'<Raw IRC message: {self.action} {self.args}>'
 
     def __bytes__(self):
-        if self.outgoing:
-            if self.action:
-                return bytes(self.action + ' ' + self.args)
-            return bytes(self.args)
-        else:
-            return b''
+        output = b''
+        if self.flags:
+            tags = []
+            for k, v in self.flags.items():
+                if isinstance(v, str):
+                    tags.append(k.encode() + b'=' + Message._escape_tag_value(v).encode())
+                # otherwise the tag is considered a way to store additional context information about the msg
+            if tags:
+                output += b'@' + b';'.join(tags) + b' '
+
+        if self.source and not self.outgoing:  # limitation introduced for backwards compatibility
+            output += b':' + self.source.encode() + b' '
+
+        if self.action:
+            output += self.action.encode()
+        if self.new_args:
+            output += b' '  # include a space before the args
+            had_trailing = False
+            for i, arg in enumerate(self.new_args):
+                if ' ' in arg and not had_trailing:
+                    had_trailing = True
+                    if i == 0:
+                        output += b':' + arg.encode()
+                    else:
+                        output += b' :' + arg.encode()
+                else:
+                    if i == 0:
+                        output += arg.encode()
+                    else:
+                        output += b' ' + arg.encode()
+        output += b'\r\n'
+        return output
+
+    @classmethod
+    def upgrade(cls, msg: 'Message'):  # -> cls
+        return msg
+
+    def _copy_from(self, other: 'Message'):
+        self.action = other.action
+        self.source = other.source
+        self.new_args = other.new_args
+        self.args = other.args
+        self.outgoing = other.outgoing
+        self.parent = other.parent
+        self.raw_data = other.raw_data
+        self.flags = other.flags
+
+    @property
+    def user(self):
+        user, _ = self.source.split('!', 1)
+        return user
 
 
 class WhisperMessage(Message):
-    @staticmethod
-    def from_match(m: typing.Match[str]):
-        flags = process_twitch_flags(m[1])
-        new = WhisperMessage(flags=flags, user_from=m[2], user_to=m[3], text=m[4])
-        new.raw_data = m[0]
+    @classmethod
+    def upgrade(cls, msg: 'Message') -> 'WhisperMessage':
+        new = cls(msg.flags, msg.user, '', msg.args, msg.outgoing)
+        new._copy_from(msg)
         return new
 
     def __repr__(self):
@@ -128,16 +233,17 @@ class WhisperMessage(Message):
         if self.outgoing:
             return bytes(f'PRIVMSG #jtv :/w {self.user_to} {self.text}\r\n', 'utf-8')
         else:
-            return b''
+            return super().__bytes__()
 
     def __init__(self, flags, user_from, user_to, text, outgoing=False):
-        super().__init__(f'{"Outgoing" if outgoing else ""} WHISPER from {user_from} to {user_to}: {text}',
-                         outgoing=outgoing)
+        super().__init__([text], outgoing=outgoing)
         self.text = text
         self.user_to = user_to
         self.user_from = user_from
         self.flags = flags
         self.channel = 'whispers'
+        self.action = 'WHISPER'
+        self.source = f'{self.user_from}!{self.user_from}@{self.user_from}.tmi.twitch.tv'
 
     @property
     def user(self):
@@ -155,40 +261,26 @@ class ChannelMessage(Message):
 
         return twitchirc.ModerationContainer.from_message(self, self.parent)
 
-    @staticmethod
-    def from_match(m: typing.Match[str]):
-        new = ChannelMessage(text=m[4], user=m[2], channel=m[3])
-        new.flags = process_twitch_flags(m[1])
-        new.raw_data = m[0]
+    @classmethod
+    def upgrade(cls, msg: 'Message'):
+        channel, text = msg.new_args
+        new = cls(text, msg.user, channel.lstrip('#'), msg.outgoing, msg.parent)
+        new._copy_from(msg)
         return new
 
-    @staticmethod
-    def from_text(text):
-        m = re.match(twitchirc.PRIVMSG_PATTERN_TWITCH, text)
-        if m:
-            return ChannelMessage.from_match(m)
-        else:
-            raise ValueError(f'Cannot create a ChannelMessage from {text!r}')
-
     def __init__(self, text: str, user: str, channel: str, outgoing=False, parent=None):
-        super().__init__(text, outgoing=outgoing, parent=parent)
-        self._type = 'PRIVMSG'
+        super().__init__(['#' + channel, text], outgoing=outgoing, parent=parent)
         self.flags = {}
         self.text: str = text.replace('\r\n', '')
-        self.user = user
+        self.source = f'{user}!{user}@{user}.tmi.twitch.tv'
         self.channel = channel
+        self.action = 'PRIVMSG'
 
     def __repr__(self):
         return 'ChannelMessage(text={!r}, user={!r}, channel={!r})'.format(self.text, self.user, self.channel)
 
     def __str__(self):
         return '#{chan} <{user}> {text}'.format(user=self.user, text=self.text, chan=self.channel)
-
-    def __bytes__(self):
-        if self.outgoing:
-            return bytes('PRIVMSG #{chan} :{text}\r\n'.format(chan=self.channel, text=self.text), 'utf-8')
-        else:
-            return b''
 
     def reply(self, text: str, force_slash=False):
         if not force_slash and text.startswith(('.', '/')):
@@ -201,128 +293,109 @@ class ChannelMessage(Message):
         new = WhisperMessage(flags={}, user_from='OUTGOING', user_to=self.user, text=text, outgoing=True)
         return new
 
+    # region new_args property
+    @property
+    def new_args(self):
+        return ['#' + self.channel, self.text]
+
+    @new_args.setter
+    def new_args(self, value):
+        pass
+    # endregion
+
 
 class PingMessage(Message):
-    @staticmethod
-    def from_match(m: typing.Match[str]):
-        new = PingMessage()
-        new.host = m[1]
-        new.raw_data = m[0]
+    @classmethod
+    def upgrade(cls, msg: 'Message'):
+        new = cls(msg.args)
+        new._copy_from(msg)
         return new
 
-    @staticmethod
-    def from_text(text):
-        m = re.match(twitchirc.PING_MESSAGSE_PATTERN, text)
-        return PingMessage.from_match(m)
-
     def __init__(self, host: typing.Optional[str] = None):
-        self.host = host
-        super().__init__(str(self))
+        args = [host] if host is not None else []
+        super().__init__(args)
         self.outgoing = False
+        self.action = 'PING'
+
+    @property
+    def host(self):
+        if self.new_args:
+            return self.new_args[-1]
+        else:
+            return None
 
     def __repr__(self):
         return 'PingMessage(host={!r})'.format(self.host)
-
-    def __str__(self):
-        return 'PING :{}'.format(self.host)
 
     def reply(self):
         return PongMessage(self.host)
 
 
 class PongMessage(Message):
-    @staticmethod
-    def from_match(m: typing.Match[str]):
-        return None
+    @classmethod
+    def upgrade(cls, msg: 'Message'):
+        new = cls(msg.args)
+        new._copy_from(msg)
+        return new
 
-    @staticmethod
-    def from_text(text):
-        return None
-
-    def __init__(self, host):
-        super().__init__(host)
-        self.host = host
+    def __init__(self, host: typing.Optional[str] = None):
+        args = [host] if host is not None else []
+        super().__init__(args)
         self.outgoing = True
+        self.action = 'PONG'
+
+    @property
+    def host(self):
+        if self.new_args:
+            return self.new_args[-1]
+        else:
+            return None
 
     def __repr__(self):
         return 'PongMessage(host={!r})'.format(self.host)
-
-    def __str__(self):
-        return 'PONG :{}'.format(self.host)
-
-    def __bytes__(self):
-        return bytes('PONG :{}\r\n'.format(self.host), 'utf-8')
 
     def reply(self):
         raise RuntimeError('Cannot reply to a PongMessage.')
 
 
 class NoticeMessage(Message):
-    @staticmethod
-    def from_match(m: typing.Match[str]):
-        new = NoticeMessage('')
-        new.message_id = process_twitch_flags(m[1])['msg-id']
-        new.host = m[2]
-        new.channel = m[3]
-        new.text = m[4]
-        # @msg-id=%s :tmi.twitch.tv NOTICE #{chan} :{msg}
-        new.raw_data = m[0]
+    @classmethod
+    def upgrade(cls, msg: 'Message'):
+        channel, text = msg.args.split(' ', 1)
+        new = NoticeMessage(text, msg.flags.get('msg-id'), channel.lstrip('#'))
+        new._copy_from(msg)
         return new
 
-    @staticmethod
-    def from_text(text):
-        m = re.match(twitchirc.NOTICE_MESSAGE_PATTERN, text)
-        if m:
-            return NoticeMessage.from_match(m)
-        else:
-            raise ValueError('Invalid NoticeMessage(NOTICE #chan): {!r}'.format(text))
-
-    def __init__(self, text, message_id=None, channel=None, host=None):
-        super().__init__(text)
+    def __init__(self, text, message_id=None, channel=None):
+        super().__init__(['#' + channel, text])
         self.text = text
-        self.message_id = message_id
         self.channel = channel
-        self.host = host
+        self.action = 'NOTICE'
 
-
-class GlobalNoticeMessage(NoticeMessage):
-    @staticmethod
-    def from_match(m: typing.Match[str]):
-        new = GlobalNoticeMessage('')
-        new.host = m[1]
-        new.text = m[2]
-        new.raw_data = m[0]
-        return new
-
-    @staticmethod
-    def from_text(text):
-        m = re.match(twitchirc.GLOBAL_NOTICE_MESSAGE_PATTERN, text)
-        if m:
-            return GlobalNoticeMessage.from_match(m)
-        else:
-            raise Exception('Invalid GlobalNoticeMessage(NOTICE *) {!r}'.format(text))
-
-    def __init__(self, text, host=None):
-        super().__init__(text, message_id=None, channel='*', host=host)
+    @property
+    def message_id(self):
+        return self.flags.get('msg-id')
 
 
 class JoinMessage(Message):
-    @staticmethod
-    def from_match(m: typing.Match[str]):
-        new = JoinMessage(m[1], m[2])
-        new.raw_data = m[0]
+    @classmethod
+    def upgrade(cls, msg: 'Message'):
+        channel = msg.new_args[0].lstrip('#')
+        new = JoinMessage(msg.user, channel, False)
+        new._copy_from(msg)
         return new
 
     def __init__(self, user: str, channel: str, outgoing=False):
         super().__init__('{} JOIN {}'.format(user, channel), outgoing=outgoing)
-        self.user = user
+        self.source = f'{user}!{user}@{user}.tmi.twitch.tv'
         self.channel = channel
+        self.action = 'JOIN'
 
     def __repr__(self) -> str:
         if self.outgoing:
-            return f'JoinMessage(user={self.user!r}, channel={self.channel!r}, outgoing=True)>'
+            return f'JoinMessage(user={self.user!r}, channel={self.channel!r}, outgoing=True)'
         else:
-            return f'JoinMessage(user={self.user!r}, channel={self.channel!r})>'
+            return f'JoinMessage(user={self.user!r}, channel={self.channel!r})'
 
     def __str__(self):
         if self.outgoing:
@@ -330,28 +403,23 @@ class JoinMessage(Message):
         else:
             return f'{self.user} JOIN {self.channel}'
 
-    def __bytes__(self):
-        if self.outgoing:
-            return bytes(f'JOIN {self.channel}\r\n', 'utf-8')
-        else:
-            return b''
-
 
 class PartMessage(Message):
-    @staticmethod
-    def from_match(m: typing.Match[str]):
-        new = PartMessage(m[1], m[2])
-        new.raw_data = m[0]
+    @classmethod
+    def upgrade(cls, msg: 'Message'):
+        channel = msg.new_args[0].lstrip('#')
+        new = PartMessage(msg.user, channel, False)
+        new._copy_from(msg)
         return new
 
     def __init__(self, user: str, channel: str, outgoing=False):
         super().__init__(f'{user} PART {channel}', outgoing=outgoing)
-        self.user = user
+        self.source = f'{user}!{user}@{user}.tmi.twitch.tv'
         self.channel = channel
 
     def __repr__(self):
         if self.outgoing:
-            return f'PartMessage(user={self.user!r}, channel={self.channel!r})  # outgoing'
+            return f'PartMessage(user={self.user!r}, channel={self.channel!r}, outgoing=True)'
         else:
             return f'PartMessage(user={self.user!r}, channel={self.channel!r})'
 
@@ -361,18 +429,13 @@ class PartMessage(Message):
         else:
             return f'<{self.user} PART {self.channel}>'
 
-    def __bytes__(self):
-        if self.outgoing:
-            return bytes(f'PART #{self.channel}', 'utf-8')
-        else:
-            return b''
-
 
 class UsernoticeMessage(Message):
-    @staticmethod
-    def from_match(m: typing.Match[str]):
-        new = UsernoticeMessage(m[1], m[2])
-        new.raw_data = m[0]
+    @classmethod
+    def upgrade(cls, msg: 'Message'):
+        channel = msg.new_args[0].lstrip('#')
+        new = UsernoticeMessage(msg.flags, channel)
+        new._copy_from(msg)
         return new
 
     def __repr__(self):
@@ -382,16 +445,17 @@ class UsernoticeMessage(Message):
         return f'<USERNOTICE {self.channel}>'
 
     def __init__(self, flags, channel):
-        super().__init__(flags + ' ' + channel)
-        self.flags = process_twitch_flags(flags)
+        super().__init__('')
+        self.flags = flags
         self.channel = channel
 
 
 class UserstateMessage(Message):
-    @staticmethod
-    def from_match(m: typing.Match[str]):
-        new = UserstateMessage(m[1], m[2])
-        new.raw_data = m[0]
+    @classmethod
+    def upgrade(cls, msg: 'Message'):
+        channel = msg.new_args[0].lstrip('#')
+        new = UsernoticeMessage(msg.flags, channel)
+        new._copy_from(msg)
         return new
 
     def __repr__(self):
@@ -401,16 +465,16 @@ class UserstateMessage(Message):
         return f'<USERSTATE {self.channel}>'
 
     def __init__(self, flags, channel):
-        super().__init__(flags + ' ' + channel)
-        self.flags = process_twitch_flags(flags)
+        super().__init__('')
+        self.flags = flags
         self.channel = channel
 
 
 class ReconnectMessage(Message):
-    @staticmethod
-    def from_match(m: typing.Match[str]):
-        new = ReconnectMessage()
-        new.raw_data = m[0]
+    @classmethod
+    def upgrade(cls, msg: 'Message'):
+        new = cls()
+        new._copy_from(msg)
         return new
 
     def __repr__(self):
@@ -423,38 +487,26 @@ class ReconnectMessage(Message):
         super().__init__('RECONNECT')
 
 
-MESSAGE_PATTERN_DICT: typing.Dict[typing.Any, typing.Union[
-    typing.Type[ChannelMessage],
-    typing.Type[PingMessage],
-    typing.Type[NoticeMessage],
-    typing.Type[GlobalNoticeMessage],
-    typing.Type[JoinMessage],
-    typing.Type[PartMessage],
-    typing.Type[WhisperMessage],
-    typing.Type[ReconnectMessage],
-    typing.Type[UsernoticeMessage]
-]
-] = {
-    re.compile(twitchirc.PRIVMSG_PATTERN_TWITCH): ChannelMessage,
-    re.compile(twitchirc.PING_MESSAGSE_PATTERN): PingMessage,
-    re.compile(twitchirc.NOTICE_MESSAGE_PATTERN): NoticeMessage,
-    re.compile(twitchirc.GLOBAL_NOTICE_MESSAGE_PATTERN): GlobalNoticeMessage,
-    re.compile(twitchirc.JOIN_MESSAGE_PATTERN): JoinMessage,
-    re.compile(twitchirc.PART_MESSAGE_PATTERN): PartMessage,
-    re.compile(twitchirc.WHISPER_MESSAGE_PATTERN): WhisperMessage,
-    re.compile(twitchirc.RECONNECT_MESSAGE_PATTERN): ReconnectMessage,
-    re.compile(twitchirc.USERNOTICE_MESSAGE_PATTERN): UsernoticeMessage,
-    re.compile(twitchirc.USERSTATE_MESSAGE_PATTERN): UserstateMessage,
+COMMAND_MESSAGE_DICT: typing.Dict[str, typing.Type[Message]] = {
+    'PRIVMSG': ChannelMessage,
+    'PING': PingMessage,
+    'PONG': PongMessage,
+    'NOTICE': NoticeMessage,
+    'JOIN': JoinMessage,
+    'PART': PartMessage,
+    'WHISPER': WhisperMessage,
+    'RECONNECT': ReconnectMessage,
+    'USERNOTICE': UsernoticeMessage,
+    'USERSTATE': UserstateMessage
 }
 
 
 def auto_message(message, parent=None):
-    for k, v in MESSAGE_PATTERN_DICT.items():
-        m = re.match(k, message)
-        if m:
-            new = v.from_match(m)
-            new.parent = parent
-            return new
+    msg = Message.from_text(message)
+    msg.parent = parent
+    for command, klass in COMMAND_MESSAGE_DICT.items():
+        if msg.action == command:
+            return klass.upgrade(msg)
 
     # if nothing matches return generic irc message.
-    return Message.from_text(message)
+    return msg

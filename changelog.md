@@ -1,3 +1,7 @@
+# Unversioned
+ - major: rewrote the entire IRC parser
+ - major: added tests
+
 # Version 1.7.8
  - major fix: `channels_connected` will now have channels removed from it and no duplicates should be generated
 
