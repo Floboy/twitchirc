@@ -18,7 +18,7 @@ from setuptools import setup
 setup(
     name='twitchirc',
     python_requires='>=3.7',
-    version='1.8.0',
+    version='1.8.1',
     packages=['twitchirc'],
     url='https://www.github.com/mm2pl/twitchirc',
     license='GPLv3',

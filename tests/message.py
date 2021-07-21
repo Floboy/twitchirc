@@ -277,9 +277,40 @@ class IrcParsingTests(unittest.TestCase):
             'key': '\\.;\r\n value'
         }, msg.flags)
 
+    def test_parse_whisper(self):
+        input_str = (
+            '@badges=glhf-pledge/1;color=#DAA520;display-name=Mm2PL;emotes=;message-id=5439;thread-id'
+            '=117691339_442600612;turbo=0;user-id=117691339;user-type= :mm2pl!mm2pl@mm2pl.tmi.twitch.tv WHISPER '
+            'mm_sutilitybot :test'
+        )
+        msg = twitchirc.auto_message(input_str)
+        self.assertEqual(twitchirc.WhisperMessage, msg.__class__, 'bad automsg')
+        self.assertEqual('mm2pl!mm2pl@mm2pl.tmi.twitch.tv', msg.source)
+        self.assertEqual('WHISPER', msg.action)
+        self.assertEqual(False, msg.outgoing)
+        self.assertEqual(input_str, msg.raw_data)
+        self.assertEqual('mm_sutilitybot :test', msg.args)
+        self.assertEqual(['mm_sutilitybot', 'test'], msg.new_args)
+        self.assertEqual('test', msg.text)
+        self.assertEqual('mm_sutilitybot', msg.user_to)
+        self.assertEqual('mm2pl', msg.user_from)
+        self.assertEqual('mm2pl', msg.user)
+
 
 # noinspection DuplicatedCode
 class IrcComposeTests(unittest.TestCase):
+    def test_compose_whisper(self):
+        msg = twitchirc.WhisperMessage({}, 'OUTGOING', 'mm2pl', 'test', True)
+        self.assertEqual('WHISPER', msg.action)
+        self.assertEqual(True, msg.outgoing)
+        self.assertEqual(':test', msg.args)
+        self.assertEqual(['test'], msg.new_args)
+        self.assertEqual('test', msg.text)
+        self.assertEqual('mm2pl', msg.user_to)
+        self.assertEqual('OUTGOING', msg.user_from)
+        self.assertEqual('OUTGOING', msg.user)
+        self.assertEqual(b'PRIVMSG #jtv :/w mm2pl test\r\n', bytes(msg))
+
     def test_compose_privmsg_raw(self):
         msg = twitchirc.Message('#test :Testing123 456', True, action='PRIVMSG')
         self.assertEqual(b'PRIVMSG #test :Testing123 456\r\n', bytes(msg))

@@ -218,7 +218,8 @@ class Message:
 class WhisperMessage(Message):
     @classmethod
     def upgrade(cls, msg: 'Message') -> 'WhisperMessage':
-        new = cls(msg.flags, msg.user, '', msg.args, msg.outgoing)
+        me, text = msg.new_args
+        new = cls(msg.flags, msg.user, me, text, msg.outgoing)
         new._copy_from(msg)
         return new
 
