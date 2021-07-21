@@ -1,4 +1,4 @@
-# Unversioned
+# Version 1.8.0
  - major: rewrote the entire IRC parser
  - major: added tests
 
