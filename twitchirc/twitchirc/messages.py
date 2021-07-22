@@ -283,7 +283,21 @@ class ChannelMessage(Message):
     def __str__(self):
         return '#{chan} <{user}> {text}'.format(user=self.user, text=self.text, chan=self.channel)
 
-    def reply(self, text: str, force_slash=False):
+    def _apply_auto_thread_reply(self, text: str, use_threads: typing.Union[typing.Literal['auto'], bool]) \
+            -> typing.Union[str, None]:
+        if use_threads is True or use_threads == 'auto':
+            prefix = '@' + self.user
+            alt_prefix = '@' + self.flags.get('display-name', '')
+            if text.startswith(prefix) or text.startswith(alt_prefix):
+                text = text.replace(prefix, '').replace(alt_prefix, '').lstrip(' ,')
+                return text
+        return None
+
+    def reply(self, text: str, force_slash=False, use_threads: typing.Union[typing.Literal['auto'], bool] = 'auto'):
+        new_text = self._apply_auto_thread_reply(text, use_threads)
+        if new_text is not None:
+            return self.reply_to_thread(new_text)
+
         if not force_slash and text.startswith(('.', '/')):
             text = '/ ' + text
         new = ChannelMessage(text=text, user='OUTGOING', channel=self.channel)
@@ -292,6 +306,19 @@ class ChannelMessage(Message):
 
     def reply_directly(self, text: str):
         new = WhisperMessage(flags={}, user_from='OUTGOING', user_to=self.user, text=text, outgoing=True)
+        return new
+
+    def reply_to_thread(self, text: str):
+        new = self.reply(text)
+        thread_id = self.flags.get('reply-parent-msg-id')  # existing reply thread
+        if not thread_id:
+            thread_id = self.flags.get('id')
+            if not thread_id:
+                twitchirc.log('warn', f'Twitch decided not to return an ID for a message? {self.raw_data}')
+                return new
+        new.flags = {
+            'reply-parent-msg-id': thread_id
+        }
         return new
 
     # region new_args property
