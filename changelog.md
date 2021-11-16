@@ -1,3 +1,6 @@
+# Version 1.8.3
+ - minor: fix userstates, hopefully for good
+
 # Version 1.8.2
  - minor: add support for sending reply threads
 
