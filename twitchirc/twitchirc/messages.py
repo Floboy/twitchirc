@@ -482,7 +482,7 @@ class UserstateMessage(Message):
     @classmethod
     def upgrade(cls, msg: 'Message'):
         channel = msg.new_args[0].lstrip('#')
-        new = UsernoticeMessage(msg.flags, channel)
+        new = cls(msg.flags, channel)
         new._copy_from(msg)
         return new
 
@@ -532,9 +532,9 @@ COMMAND_MESSAGE_DICT: typing.Dict[str, typing.Type[Message]] = {
 def auto_message(message, parent=None):
     msg = Message.from_text(message)
     msg.parent = parent
-    for command, klass in COMMAND_MESSAGE_DICT.items():
-        if msg.action == command:
-            return klass.upgrade(msg)
+    klass = COMMAND_MESSAGE_DICT.get(msg.action)
+    if klass:
+        return klass.upgrade(msg)
 
     # if nothing matches return generic irc message.
     return msg
