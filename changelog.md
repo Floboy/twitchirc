@@ -1,3 +1,6 @@
+# Version 1.8.4
+ - minor: add support for ROOMSTATEs
+
 # Version 1.8.3
  - minor: fix userstates, hopefully for good
 
