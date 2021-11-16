@@ -498,6 +498,26 @@ class UserstateMessage(Message):
         self.channel = channel
 
 
+class RoomstateMessage(Message):
+    @classmethod
+    def upgrade(cls, msg: 'Message'):
+        channel = msg.new_args[0].lstrip('#')
+        new = cls(msg.flags, channel)
+        new._copy_from(msg)
+        return new
+
+    def __repr__(self):
+        return f'RoomstateMessage(flags={self.flags!r}, channel={self.channel!r})'
+
+    def __str__(self):
+        return f'<ROOMSTATE {self.channel}>'
+
+    def __init__(self, flags, channel):
+        super().__init__('')
+        self.flags = flags
+        self.channel = channel
+
+
 class ReconnectMessage(Message):
     @classmethod
     def upgrade(cls, msg: 'Message'):
@@ -525,7 +545,8 @@ COMMAND_MESSAGE_DICT: typing.Dict[str, typing.Type[Message]] = {
     'WHISPER': WhisperMessage,
     'RECONNECT': ReconnectMessage,
     'USERNOTICE': UsernoticeMessage,
-    'USERSTATE': UserstateMessage
+    'USERSTATE': UserstateMessage,
+    'ROOMSTATE': RoomstateMessage
 }
 
 

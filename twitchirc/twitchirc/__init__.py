@@ -18,7 +18,7 @@
 from .moderation import ModerationContainer
 from .messages import (ChannelMessage, PartMessage, Message, JoinMessage, NoticeMessage, PingMessage, auto_message,
                        PongMessage, WhisperMessage, ReconnectMessage, UserstateMessage,
-                       UsernoticeMessage)
+                       UsernoticeMessage, RoomstateMessage)
 from .middleware import Event, AbstractMiddleware
 from .connection import Connection
 from .command import Command
