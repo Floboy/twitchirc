@@ -95,7 +95,7 @@ def log(level: str, *message: str, sep: str = ' '):
         log_file.write(msg)
         log_file.flush()
     if not quiet:
-        print(msg, end='', flush=True)
+        pass
 
 
 def info(*message: str):
